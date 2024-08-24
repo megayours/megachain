@@ -1,9 +1,9 @@
+/* global console, process */
+
 import { spawnSync, exec } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { console } from 'console';
-import { process } from 'process';
 
 dotenv.config();
 

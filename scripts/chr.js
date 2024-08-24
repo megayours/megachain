@@ -1,7 +1,7 @@
+/* global console, process */
+
 import { exec } from 'child_process';
 import dotenv from 'dotenv';
-import { console } from 'console';
-import { process } from 'process';
 
 dotenv.config();
 
