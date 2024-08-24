@@ -1,0 +1,31 @@
+operation upload_module(name: text, config: text) {
+  val hash = _calculate_module_hash(config, _get_module_path(name));
+  val sm = create sealed_module(name, hash);
+}
+
+operation create_dapp(blockchain_rid: byte_array) {
+  create dapp(blockchain_rid);
+}
+
+operation link_module(blockchain_rid: byte_array, name: text) {
+  val dapp = require(dapp @? { blockchain_rid }, "No such dapp registered");
+  val sm = require(sealed_module @? { name }, "No such module found");
+  create dapp_module(dapp, sm);
+}
+
+operation submit_deployment(blockchain_rid: byte_array, config: text) {
+  val dapp = require(dapp @? { blockchain_rid }, "No such dapp registered");
+  val linked_modules = dapp_module @* { dapp };
+
+  for (lm in linked_modules) {
+    val hash = _calculate_module_hash(config, _get_module_path(lm.sealed_module.name));
+    require(lm.sealed_module.hash == hash, "Module hash mismatch");
+  }
+
+  create deployed_dapp_config(
+    dapp, 
+    timestamp = op_context.last_block_time,
+    hash = config.to_bytes().sha256(),
+    config
+  );
+}

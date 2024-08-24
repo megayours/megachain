@@ -1,0 +1,18 @@
+entity sealed_module {
+  key name: text;
+  hash: byte_array;
+}
+
+entity dapp {
+  key id: byte_array; // TODO: Replace once we persist owner
+}
+
+entity deployed_dapp_config {
+  key dapp, timestamp;
+  key dapp, hash: byte_array;
+  config: text;
+}
+
+entity dapp_module {
+  key dapp, sealed_module;
+}

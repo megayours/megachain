@@ -1,0 +1,83 @@
+function find_entry_content(xml_content: text, m_path: text): map<text, text> {
+  val xml_dict = parse_xml(xml_content);
+  return find_entries_in_dict(xml_dict, m_path);
+}
+
+function parse_xml(xml_content: text): map<text, gtv> {
+  var result = map<text, gtv>();
+  var current_key = "";
+  var current_value = "";
+  var stack = list<map<text, gtv>>();
+  var inside_string = false;
+
+  for (line in xml_content.split("\n")) {
+    val trimmed_line = line.trim();
+    log("Line: " + trimmed_line);
+    if (trimmed_line.starts_with("<entry key=\"")) {
+      current_key = trimmed_line.sub(12, trimmed_line.index_of("\">"));
+      current_value = "";
+    } else if (trimmed_line.starts_with("<string>")) {
+      inside_string = true;
+      current_value = trimmed_line.sub(8);
+      if (trimmed_line.contains("</string>")) {
+        current_value = current_value.sub(0, current_value.index_of("</string>"));
+        inside_string = false;
+      }
+    } else if (inside_string) {
+      if (trimmed_line.contains("</string>")) {
+        current_value += "\n" + trimmed_line.sub(0, trimmed_line.index_of("</string>"));
+        inside_string = false;
+      } else {
+        current_value += "\n" + trimmed_line;
+      }
+    } else if (trimmed_line.starts_with("<int>")) {
+      current_value = trimmed_line.sub(5, trimmed_line.index_of("</int>"));
+    } else if (trimmed_line.starts_with("<dict>")) {
+      stack.add(result);
+      result = map<text, gtv>();
+    } else if (trimmed_line.starts_with("<array>")) {
+      stack.add(result);
+      result = map<text, gtv>();
+    } else if (trimmed_line.starts_with("</entry>")) {
+      if (stack.size() > 0) {
+        val parent = stack.remove_at(stack.size() - 1);
+        parent[current_key] = result.to_gtv();
+        result = parent;
+      } else {
+        result[current_key] = current_value.to_gtv();
+      }
+    } else if (trimmed_line.starts_with("</dict>") or trimmed_line.starts_with("</array>")) {
+      if (stack.size() > 0) {
+        val parent = stack.remove_at(stack.size() - 1);
+        parent[current_key] = result.to_gtv();
+        result = parent;
+      }
+    }
+  }
+
+  return result;
+}
+
+function find_entries_in_dict(dict: map<text, gtv>, m_path: text): map<text, text> {
+  var result = map<text, text>();
+
+  for (k in dict.keys()) {
+    log("Entry key: ", k);
+    val value = dict[k];
+    if (k.contains(m_path)) {
+      result[k] = text.from_gtv(value);
+    } else if (try_call(map<text, gtv>.from_gtv(value, *)) != null) {
+      val nested_result = find_entries_in_dict(map<text, gtv>.from_gtv(value), m_path);
+      result.put_all(nested_result);
+    } else if (try_call(list<gtv>.from_gtv(value, *)) != null) {
+      for (item in list<gtv>.from_gtv(value)) {
+        if (try_call(map<text, gtv>.from_gtv(item, *)) != null) {
+          val nested_result = find_entries_in_dict(map<text, gtv>.from_gtv(item), m_path);
+          result.put_all(nested_result);
+        }
+      }
+    }
+  }
+
+  return result;
+}

@@ -1,0 +1,14 @@
+function _calculate_module_hash(config: text, path: text): byte_array {
+  val source_files = util.find_entry_content(config, path);
+  var concatenated_hashes: byte_array = x"";
+  for (file in source_files.keys()) {
+    val normalized = util.normalize(source_files[file]);
+    concatenated_hashes += crypto.sha256(normalized.to_bytes());
+  }
+
+  return crypto.sha256(concatenated_hashes);
+}
+
+function _get_module_path(name: text): text {
+  return "lib/%s".format(name);
+}

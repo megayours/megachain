@@ -1,0 +1,3818 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<dict>
+    <entry key="add_primary_key_to_header">
+        <int>1</int>
+    </entry>
+    <entry key="blockstrategy">
+        <dict>
+            <entry key="mininterblockinterval">
+                <int>1000</int>
+            </entry>
+            <entry key="name">
+                <string>net.postchain.base.BaseBlockBuildingStrategy</string>
+            </entry>
+        </dict>
+    </entry>
+    <entry key="config_consensus_strategy">
+        <string>HEADER_HASH</string>
+    </entry>
+    <entry key="configurationfactory">
+        <string>net.postchain.gtx.GTXBlockchainConfigurationFactory</string>
+    </entry>
+    <entry key="gtx">
+        <dict>
+            <entry key="modules">
+                <array>
+                    <string>net.postchain.rell.module.RellPostchainModuleFactory</string>
+                    <string>net.postchain.gtx.StandardOpsGTXModule</string>
+                </array>
+            </entry>
+            <entry key="rell">
+                <dict>
+                    <entry key="compilerVersion">
+                        <string>0.13.14</string>
+                    </entry>
+                    <entry key="moduleArgs">
+                        <dict>
+                            <entry key="lib.ft4.core.accounts">
+                                <dict>
+                                    <entry key="rate_limit">
+                                        <dict>
+                                            <entry key="active">
+                                                <int>0</int>
+                                            </entry>
+                                        </dict>
+                                    </entry>
+                                </dict>
+                            </entry>
+                        </dict>
+                    </entry>
+                    <entry key="modules">
+                        <array>
+                            <string>example_dapp1</string>
+                        </array>
+                    </entry>
+                    <entry key="sources">
+                        <dict>
+                            <entry key="example_dapp1/importer/module.rell">
+                                <string>@mount("importer")
+module;
+
+import shared_module;
+import ^.tracker;
+
+
+import lib.yours;
+import lib.ft4.auth;</string>
+                            </entry>
+                            <entry key="example_dapp1/importer/operations.rell">
+                                <string>@extend(auth.auth_handler)
+function () = auth.add_auth_handler(
+  flags = []
+);
+
+operation nft(metadata: yours.token_metadata_incoming, token_id: integer) {
+  val account = auth.authenticate();
+
+  val token = yours.create_token_with_id(
+    yours.token_info(
+      project = metadata.yours.project,
+      collection = metadata.yours.collection,
+      name = metadata.name,
+      modules = []
+    ),
+    token_id
+  );
+
+  create yours.imported_attributes ( token, json = metadata.properties );
+
+  yours.attach_image(token, metadata.image);
+  yours.attach_description(token, metadata.description);
+  yours.attach_animation(token, metadata.animation_url);
+
+  shared_module.attach(token);
+  tracker.attach(token);
+
+  yours.mint(token, yours.balance_info(account, amount = 1));
+}
+
+operation sft(metadata: yours.token_metadata_incoming) {
+  auth.authenticate();
+
+  val token = yours.create_token(
+    yours.token_info(
+      project = metadata.yours.project,
+      collection = metadata.yours.collection,
+      name = metadata.name,
+      modules = []
+    )
+  );
+
+  create yours.imported_attributes ( token, json = metadata.properties );
+
+  yours.attach_image(token, metadata.image);
+  yours.attach_description(token, metadata.description);
+  yours.attach_animation(token, metadata.animation_url);
+
+  shared_module.attach(token);
+  tracker.attach(token);
+}
+
+operation mint(project: name, collection: name, token_id: integer, amount: integer) {
+  val account = auth.authenticate();
+
+  val token = require(yours.get_token(project, collection, token_id));
+  yours.mint(token, yours.balance_info(account, amount = amount));
+}
+</string>
+                            </entry>
+                            <entry key="example_dapp1/importer/queries.rell">
+                                <string>query get_tokens() {
+  return yours.token @* {} ( token_id = $.id, metadata = yours.get_metadata($) );
+}</string>
+                            </entry>
+                            <entry key="example_dapp1/module.rell">
+                                <string>module;
+
+import .importer;
+
+import lib.yours;
+import lib.yours.crosschain;
+import lib.iccf;
+import lib.ft4.accounts.strategies.open;
+
+
+operation iccf_proof(
+  blockchain_rid: byte_array,
+  tx_hash: byte_array,
+  tx_proof: byte_array,
+  tx_data: byte_array,
+  tx_index: integer,
+  anchoring_proof: byte_array
+) {}
+</string>
+                            </entry>
+                            <entry key="example_dapp1/tracker/functions.rell">
+                                <string>function attach(yours.token) {
+  yours.attach_module(token, "tracker");
+  create tracker ( token, op_context.last_block_time );
+}
+</string>
+                            </entry>
+                            <entry key="example_dapp1/tracker/module.rell">
+                                <string>module;
+
+import lib.yours;
+
+entity tracker {
+  key yours.token;
+  mutable last_block_time: integer;
+}
+
+@extend(yours.populate_metadata)
+function populate_metadata(yours.token, modules: set&lt;name&gt;): map&lt;text, gtv&gt;? {
+  if (not modules.contains("tracker")) return null;
+  val metadata = map&lt;text, gtv&gt;();
+
+  val tracker = tracker @? { token };
+  if (tracker == null) return null;
+
+  metadata.put("Recent Mega Chain Visit", tracker.last_block_time.to_gtv());
+
+  return metadata;
+}
+
+@extend(yours.after_apply_transfer)
+function after_apply_transfer(yours.token, modules: set&lt;name&gt;,attributes: map&lt;text, gtv&gt;) {
+  if (not modules.contains("tracker")) return;
+
+  val tracker = tracker @? { token };
+  if (tracker == null) {
+    create tracker(token, op_context.last_block_time);
+  } else {
+    update tracker ( last_block_time = op_context.last_block_time );
+  }
+}</string>
+                            </entry>
+                            <entry key="lib/ft4/accounts/module.rell">
+                                <string>import ^.core.accounts.*;
+import external: ^.external.accounts;
+</string>
+                            </entry>
+                            <entry key="lib/ft4/accounts/strategies/module.rell">
+                                <string>import ^^.core.accounts.strategies.*;
+import external: ^^.external.accounts.strategies;
+</string>
+                            </entry>
+                            <entry key="lib/ft4/accounts/strategies/open/module.rell">
+                                <string>import ^^^.core.accounts.strategies.open.*;</string>
+                            </entry>
+                            <entry key="lib/ft4/auth/module.rell">
+                                <string>import ^.core.auth.*;
+import external: ^.external.auth;
+</string>
+                            </entry>
+                            <entry key="lib/ft4/core/accounts/auth_basic.rell">
+                                <string>
+struct single_sig_args {
+    flags: set&lt;text&gt;;
+    signer: byte_array;
+}
+
+struct multi_sig_args {
+    flags: set&lt;text&gt;;
+    signatures_required: integer;
+    signers: list&lt;byte_array&gt;;
+}
+
+/*
+ * Returns VALID if valid.
+ */
+function check_single_sig_auth(args: byte_array, signers: list&lt;byte_array&gt;, required_flags: list&lt;text&gt;): utils.validation_result {
+    if(signers.size() &gt; 1) {
+        return utils.invalid("Single sig Auth Descriptor must have only one signer.");
+    }
+    if (signers.size() &lt; 1) {
+        return utils.invalid("Single sig Auth Descriptor's signer list is empty.");
+    }
+
+    val ss_args = single_sig_args.from_bytes(args);
+    if ( check_required_flags(ss_args.flags, required_flags)) {
+        if (op_context.is_signer(signers[0])) {
+            return utils.VALID;
+        } else {
+            return utils.invalid("The auth descriptor signer did not sign the transaction.");
+        }
+    } else {
+        return utils.invalid("Some required flags " + required_flags.to_text() + " are missing on the (single sig) Auth Descriptor.");
+    }
+}
+
+/*
+ * Returns VALID if valid.
+ */
+function check_multi_sig_auth(args: byte_array, signers: list&lt;byte_array&gt;, required_flags: list&lt;text&gt;): utils.validation_result {
+    val multi_sign_args = multi_sig_args.from_bytes(args);
+    if (not (check_required_flags(multi_sign_args.flags, required_flags))) {
+       return utils.invalid("Some required flags " + required_flags.to_text() + " are missing on the (multi sig) Auth Descriptor.");
+    }
+    var num_sign = multi_sign_args.signatures_required;
+    for(s in signers) {
+        if(op_context.is_signer(s)) {
+            num_sign -= 1;
+            if(num_sign &lt; 1) {
+                return utils.VALID;
+            }
+        }
+    }
+    return utils.invalid("Transaction must be signed by at least " + multi_sign_args.signatures_required + " signers in the Auth Descriptor.");
+}
+
+/*
+ * Returns false if any of the required flags are missing from the "flags" set.
+ */
+function check_required_flags(flags: set&lt;text&gt;, required_flags: list&lt;text&gt;): boolean {
+    return flags.contains_all(required_flags);
+}
+
+/*
+ * Returns the set of flags found in the "args" parameter.
+ */
+function get_flags_from_args(a_t: auth_type, args: byte_array): set&lt;text&gt; {
+    return when (a_t) {
+        S -&gt; single_sig_args.from_bytes(args).flags;
+        M -&gt; multi_sig_args.from_bytes(args).flags;
+    };
+}
+
+/*
+ * Returns VALID if authentication arguments are valid.
+ */
+function check_auth_args(a_t: auth_type, args: byte_array, signers: list&lt;byte_array&gt;, required_flags: list&lt;text&gt;): utils.validation_result {
+    return when (a_t) {
+        S -&gt; check_single_sig_auth(args, signers, required_flags);
+        M -&gt; check_multi_sig_auth(args, signers, required_flags);
+    };
+}
+
+function get_signers_from_encoded_auth_descriptor(a_t: auth_type, args: byte_array): list&lt;byte_array&gt; {
+    return when (a_t) {
+        S -&gt; [single_sig_args.from_bytes(args).signer];
+        M -&gt; multi_sig_args.from_bytes(args).signers;
+    };
+}
+
+function get_signers(auth_descriptor)
+    = when (auth_descriptor.auth_type) {
+        S -&gt; [single_sig_args.from_gtv(auth_descriptor.args.to_gtv()).signer];
+        M -&gt; multi_sig_args.from_gtv(auth_descriptor.args.to_gtv()).signers;
+    };
+</string>
+                            </entry>
+                            <entry key="lib/ft4/core/accounts/auth_descriptor_rule_expression.rell">
+                                <string>enum rule_variable {
+	block_height,
+	block_time,
+	op_count
+}
+
+enum rule_operator {
+	lt,
+	le,
+	eq,
+	ge,
+	gt
+}
+
+struct rule_expression {
+	operator: rule_operator;
+	variable: rule_variable;
+	value: integer;
+}
+
+struct rule_parameters {
+	variable: rule_variable;
+	value: integer;
+}
+
+/*
+ * Operator functions
+ */
+
+function greater_than(rule_parameters): rule_expression {
+    return rule_expression(
+        rule_parameters.variable,
+        rule_operator.gt,
+        rule_parameters.value
+    );
+}
+
+function greater_or_equal(rule_parameters): rule_expression {
+    return rule_expression(
+        rule_parameters.variable,
+        rule_operator.ge,
+        rule_parameters.value
+    );
+}
+
+function equals(rule_parameters): rule_expression {
+    return rule_expression(
+        rule_parameters.variable,
+        rule_operator.eq,
+        rule_parameters.value
+    );
+}
+
+function less_than(rule_parameters): rule_expression {
+    return rule_expression(
+        rule_parameters.variable,
+        rule_operator.lt,
+        rule_parameters.value
+    );
+}
+
+function less_or_equal(rule_parameters): rule_expression {
+    return rule_expression(
+        rule_parameters.variable,
+        rule_operator.le,
+        rule_parameters.value
+    );
+}
+
+/*
+ * Rule variable functions
+ */
+
+function block_height(integer): rule_parameters {
+    return rule_parameters(
+        rule_variable.block_height,
+        integer
+    );
+}
+
+function block_time(integer): rule_parameters {
+    return rule_parameters(
+        rule_variable.block_time,
+        integer
+    );
+}
+
+function op_count(integer): rule_parameters {
+    return rule_parameters(
+        rule_variable.op_count,
+        integer
+    );
+}</string>
+                            </entry>
+                            <entry key="lib/ft4/core/accounts/auth_descriptor_rule_validation.rell">
+                                <string>function serialize_rules(rules: list&lt;rule_expression&gt;): gtv {
+	if (rules.size() == 0) {
+		return GTV_NULL;
+	}
+	if (rules.size() == 1) {
+		return rule_expression_to_gtv(rules[0]);
+	}
+
+	val rules_gtv = ["and".to_gtv()];
+	for (rule in rules) {
+		rules_gtv.add(rule_expression_to_gtv(rule));
+	}
+	return rules_gtv.to_gtv();
+}
+
+function rule_expression_to_gtv(rule_expression): gtv = [
+        rule_expression.operator.name.to_gtv(),
+        rule_expression.variable.name.to_gtv(),
+        rule_expression.value.to_gtv()
+    ].to_gtv();
+
+function rule_expression_from_gtv(gtv) {
+	val components = list&lt;gtv&gt;.from_gtv(gtv);
+	val operator_name = text.from_gtv(components[0]);
+	val variable_name = text.from_gtv(components[1]);
+	val value = integer.from_gtv(components[2]);
+
+	val operator = require(
+			rule_operator.values() @? { .name == operator_name },
+			"Unknown rule operator %s".format(operator_name)
+	);
+
+	val variable = require(
+			rule_variable.values() @? { .name == variable_name },
+			"Unknown rule variable %s".format(variable_name)
+	);
+
+	return rule_expression(
+			operator,
+			variable,
+			value
+	);
+}
+
+function map_rule_expressions_from_gtv(gtv_rules: list&lt;gtv&gt;) {
+	val rules = list&lt;rule_expression&gt;();
+	for (rule in gtv_rules) {
+		rules.add(rule_expression_from_gtv(rule));
+	}
+	return rules;
+}
+
+function have_violating_rules(auth_descriptor: account_auth_descriptor) =
+	are_rules_violating(gtv.from_bytes(auth_descriptor.rules), load_variables(auth_descriptor.ctr));
+
+function load_variables(op_count: integer): map&lt;text, gtv&gt; {
+	val variables = map&lt;text, gtv&gt;();
+	variables[rule_variable.op_count.name] = (op_count + 1).to_gtv();
+	variables[rule_variable.block_height.name] = op_context.block_height.to_gtv();
+	variables[rule_variable.block_time.name] = op_context.last_block_time.to_gtv();
+	return variables;
+}
+
+function are_rules_violating(rules: gtv, variables: map&lt;text, gtv&gt;): boolean {
+	if (rules == GTV_NULL) {
+		return false;
+	}
+
+	val rules_gtv = list&lt;gtv&gt;.from_gtv(rules);
+
+	if (rules_gtv[0] != "and".to_gtv()) {
+		require(
+			rules_gtv.size() == 3,
+			"Expected a single rule expression, but got something else"
+		); // This error will be caught on the next line as well, but like this we can give a better error message
+
+		return is_rule_violated(rule_expression_from_gtv(rules_gtv.to_gtv()), variables);
+	}
+
+	return are_and_rules_violated(map_rule_expressions_from_gtv(rules_gtv.sub(1)), variables);
+}
+
+function is_rule_violated(rule: rule_expression, variables: map&lt;text, gtv&gt;): boolean {
+	return not evaluate_int_variable_rule(rule, variables);
+}
+
+function are_and_rules_violated(rules: list&lt;rule_expression&gt;, variables: map&lt;text, gtv&gt;): boolean {
+	for (rule in rules) {
+		if (is_rule_violated(rule, variables)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function is_active(account_auth_descriptor) = are_rules_active(gtv.from_bytes(account_auth_descriptor.rules));
+
+function are_rules_active(rules: gtv): boolean {
+	if (rules == GTV_NULL) {
+		return true;
+	}
+
+	val gtv_rules = list&lt;gtv&gt;.from_gtv(rules);
+	if (gtv_rules[0] == "and".to_gtv()) {
+		for (rule in gtv_rules.sub(1)) {
+			if (not is_rule_active(rule_expression_from_gtv(rule))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	return is_rule_active(rule_expression_from_gtv(gtv_rules.to_gtv()));
+}
+
+function is_rule_active(rule: rule_expression): boolean {
+	return when (rule.variable) {
+		block_height -&gt; is_block_height_rule_active(rule);
+		block_time -&gt; is_block_time_rule_active(rule);
+		op_count -&gt; true;
+	};
+}
+
+/*
+ *  Variables
+ */
+
+function evaluate_int_variable_rule(
+	rule: rule_expression,
+	variables: map&lt;text, gtv&gt;
+): boolean {
+	val current_value = variable_value(
+		rule.variable,
+		variables
+	);
+	val defined_value = rule.value;
+
+	when (rule.operator) {
+		rule_operator.lt -&gt; {
+			return current_value &lt; defined_value;
+		}
+		rule_operator.le -&gt; {
+			return current_value &lt;= defined_value;
+		}
+		rule_operator.eq -&gt; {
+			return current_value == defined_value;
+		}
+		rule_operator.ge -&gt; {
+			return current_value &gt;= defined_value;
+		}
+		rule_operator.gt -&gt; {
+			return current_value &gt; defined_value;
+		}
+	}
+}
+ 
+function variable_value(
+	variable: rule_variable,
+	variables: map&lt;text, gtv&gt;
+): integer {
+	when (variable) {
+		rule_variable.block_height -&gt; {
+			return integer.from_gtv(variables[rule_variable.block_height.name]);
+		}
+		rule_variable.block_time -&gt; {
+			return integer.from_gtv(variables[rule_variable.block_time.name]);
+		}
+		rule_variable.op_count -&gt; {
+			return integer.from_gtv(variables[rule_variable.op_count.name]);
+		}
+	}
+}
+
+/*
+ * Analyze the rules before assigning them to an authenticator descriptor
+ */
+function validate_auth_descriptor_rules(rules: gtv) {
+ 	if (rules == GTV_NULL) {
+		return;
+	}
+
+	val rules_gtv = list&lt;gtv&gt;.from_gtv(rules);
+	if (rules_gtv[0] != "and".to_gtv()) {
+		validate_rule(rule_expression_from_gtv(rules_gtv.to_gtv()));
+	} else {
+		// +1 keeps track of the "and"
+		require(rules_gtv.size() &lt;= chain_context.args.auth_descriptor.max_rules + 1, "Too many rules");
+
+		for (gtv_rule in rules_gtv.sub(1)) {
+			validate_rule(rule_expression_from_gtv(gtv_rule));
+		}
+	}
+
+	require((not are_rules_active(rules)) or (not are_rules_violating(rules, load_variables(op_count = 0))),
+		"Active and invalid rules detected");
+}
+
+function validate_rule(rule: rule_expression) {
+	when (rule.variable) {
+		rule_variable.block_height -&gt; {
+			require(rule.value &gt;= 0, "rule variable block_height must be a non-negative value");
+		}
+		rule_variable.block_time -&gt; {
+			require(rule.value &gt;= 0, "rule variable block_time must be a non-negative value");
+		}
+		rule_variable.op_count -&gt; {
+			when (rule.operator) {
+				rule_operator.lt -&gt; require(rule.value &gt; 1, "rule variable op_count must be a positive value greater than 1");
+				rule_operator.le -&gt; require(rule.value &gt; 0, "rule variable op_count must be a positive value");
+				else -&gt; require(false, "rule variable op_count must be lt or le");
+			}
+		}
+	}
+}
+
+function update_auth_descriptor_rule_variables(desc: account_auth_descriptor) {
+	desc.ctr += 1;
+	return desc;
+}
+
+/*
+ * auth descriptor cleanup
+ */
+
+function delete_expired_auth_descriptors(account) {
+	val auth_descriptors = account_auth_descriptor @* { account };
+
+	val deleted_descriptors = set&lt;account_auth_descriptor&gt;();
+
+	for (auth_descriptor in auth_descriptors) {
+		if (is_active(auth_descriptor) and have_violating_rules(auth_descriptor)) {
+			delete_auth_descriptor(auth_descriptor);
+			deleted_descriptors.add(auth_descriptor);
+		}
+	}
+
+	return deleted_descriptors;
+}
+
+/****************************************************************************************
+ *                                     block_time                                       *
+ ****************************************************************************************/
+
+function is_block_time_rule_active(r: rule_expression): boolean {
+	when (r.operator) {
+		rule_operator.gt -&gt; {
+			return op_context.last_block_time &gt; r.value;
+		}
+		rule_operator.ge,
+		rule_operator.eq -&gt; {
+			return op_context.last_block_time &gt;= r.value;
+		}
+		else -&gt; {
+			return true;
+		}
+	}
+}
+
+
+/****************************************************************************************
+ *                                  block_height                                        *
+ ****************************************************************************************/
+
+function is_block_height_rule_active(r: rule_expression): boolean {
+	when (r.operator) {
+		rule_operator.gt -&gt; {
+			return op_context.block_height &gt; r.value;
+		}
+		rule_operator.ge,
+		rule_operator.eq -&gt; {
+			return op_context.block_height &gt;= r.value;
+		}
+		else -&gt; {
+			return true;
+		}
+	}
+}
+</string>
+                            </entry>
+                            <entry key="lib/ft4/core/accounts/auth_external.rell">
+                                <string>
+function AuthDescriptor(id: byte_array) = require(
+    account_auth_descriptor @? { id },
+    "Provided auth descriptor id does not exist %s".format(id)
+);
+
+function Account(id: byte_array) = require(
+    account @? { id },
+    "Account not found: %s".format(id)
+);
+</string>
+                            </entry>
+                            <entry key="lib/ft4/core/accounts/auth_flags_config.rell">
+                                <string>
+struct auth_flags_config {
+    mandatory: gtv = ["A", "T"].to_gtv();
+    default: gtv? = null;
+}
+
+function get_raw_auth_flags_config() {
+    return chain_context.args.auth_flags;
+}
+
+function get_auth_flags_config() {
+    val flags = chain_context.args.auth_flags;
+    val mandatory = parse_auth_flags(flags.mandatory);
+    val default = if (flags.default??) parse_auth_flags(flags.default!!) else mandatory;
+
+    return (
+        mandatory = mandatory,
+        default = default
+    );
+}
+
+function parse_auth_flags(gtv) {
+    var flags = list&lt;text&gt;();
+    
+    if (utils.is_list(gtv)) {
+        flags = require(
+            try_call(list&lt;text&gt;.from_gtv(gtv, *)),
+            "Cannot parse auth flags. Expected flags list, but found &lt;%s&gt;".format(gtv)
+        );
+    } else if (utils.is_text(gtv)) {
+        flags = (text.from_gtv(gtv).split(",")) @* {} ($.trim());
+    } else {
+        require(false, "Expected flags list or comma separated flags list, but found &lt;%s&gt;".format(gtv));
+    }
+
+    require_valid_auth_flags(flags);
+
+    return flags;
+}
+
+function require_valid_auth_flags(flags: list&lt;text&gt;) {
+    val invalid_flags = flags @* { not $.matches("[a-z_A-Z]+") };
+    require(
+        empty(invalid_flags),
+        "Found invalid flags &lt;%s&gt;".format(invalid_flags)
+    );
+}
+</string>
+                            </entry>
+                            <entry key="lib/ft4/core/accounts/module.rell">
+                                <string>@mount('ft4')
+module;
+
+import ^^.utils;
+import ^^.version;
+
+val GTV_NULL = null.to_gtv();
+val GTV_NULL_BYTES = null.to_gtv().to_bytes();
+
+struct rate_limit_config {
+    active: boolean = true;
+	max_points: integer = 10;
+    recovery_time: integer = 5000;
+    points_at_account_creation: integer = 1;
+}
+
+struct auth_descriptor_config {
+    max_rules: integer = 8;
+    max_number_per_account: integer = 10;
+}
+
+struct module_args {
+	rate_limit: rate_limit_config = rate_limit_config();
+    auth_descriptor: auth_descriptor_config = auth_descriptor_config();
+    auth_flags: auth_flags_config = auth_flags_config();
+}
+
+val AUTH_DESCRIPTORS_PER_ACCOUNT_UPPER_BOUND = min(
+    200,
+    chain_context.args.auth_descriptor.max_number_per_account
+);
+
+function get_auth_descriptor_config() = chain_context.args.auth_descriptor;
+
+/**
+ * Constant that represents account type for regular user accounts 
+ * created with `create_account_with_auth`.
+ */
+val ACCOUNT_TYPE_USER = "FT4_USER";
+
+enum auth_type {
+    S, M,
+}
+
+struct auth_descriptor {
+    auth_type;
+    args: list&lt;gtv&gt;;
+    rules: gtv;
+}
+
+entity account {
+    key id: byte_array;
+    index type: text;
+}
+
+entity main_auth_descriptor {
+    key account;
+    key auth_descriptor: account_auth_descriptor;
+}
+
+entity account_auth_descriptor {
+    id: byte_array;
+    key account, id;
+    index id;
+    auth_type;
+    args: byte_array;
+    rules: byte_array;
+    mutable ctr: integer;
+    created: timestamp;
+}
+
+entity auth_descriptor_signer {
+    key account_auth_descriptor, id: byte_array;
+}
+
+// rate limiter
+entity rl_state {
+    key account;
+    mutable points: integer;
+    mutable last_update: timestamp;
+    mutable recovery_time: timestamp;
+}
+
+
+function add_auth_descriptor(account, auth_descriptor): account_auth_descriptor {
+    require(
+        (account_auth_descriptor @ { account } (@sum 1))  &lt;
+            AUTH_DESCRIPTORS_PER_ACCOUNT_UPPER_BOUND,
+        "Max &lt;%d&gt; auth descriptor count reached. Delete some before adding new ones."
+            .format(AUTH_DESCRIPTORS_PER_ACCOUNT_UPPER_BOUND)
+    );
+    
+    val id = auth_descriptor.hash();
+
+    validate_auth_descriptor_args(auth_descriptor);
+    validate_auth_descriptor_rules(auth_descriptor.rules);
+
+    val account_auth_descriptor = create account_auth_descriptor (
+        account, 
+        id,
+        auth_descriptor.auth_type,
+        args = auth_descriptor.args.to_gtv().to_bytes(),
+        rules = auth_descriptor.rules.to_gtv().to_bytes(),
+        created = utils.latest_time(),
+        ctr = 0
+    );
+
+    add_signers(account, auth_descriptor, account_auth_descriptor);
+    return account_auth_descriptor;
+}
+
+/**
+ * Deletes old main auth descriptor and sets provided auth descriptor as main auth descriptor
+ */
+function update_main_auth_descriptor(account, auth_descriptor) {
+    require(auth_descriptor.rules == GTV_NULL, "Main auth descriptor cannot be restricted");
+    require_mandatory_flags(auth_descriptor);
+    delete_main_auth_descriptor(account);
+    val account_auth_descriptor = add_auth_descriptor(account, auth_descriptor);
+    set_main_auth_descriptor(account, account_auth_descriptor);
+}
+
+function delete_main_auth_descriptor(account) {
+    val main_auth_descriptor = require(
+        main_auth_descriptor @? { account },
+        "Error deleting main auth descriptor of account &lt;%s&gt;. Auth descriptor not found".format(account.id)
+    );
+
+    val auth_descriptor = main_auth_descriptor.auth_descriptor;
+    delete main_auth_descriptor;
+    delete_auth_descriptor(auth_descriptor);
+}
+
+function set_main_auth_descriptor(account, account_auth_descriptor) {
+    require(
+        empty(main_auth_descriptor @? { account }),
+        "Error setting main auth descriptor. Main auth descriptor already exists"
+    );
+
+    create main_auth_descriptor(account, account_auth_descriptor);
+}
+
+function delete_auth_descriptor(auth_descriptor: account_auth_descriptor) {
+    require(
+        main_auth_descriptor @? { auth_descriptor } == null,
+        "Cannot delete main auth descriptor"
+    );
+    delete auth_descriptor_signer @* { auth_descriptor };
+    delete auth_descriptor;
+}
+
+function delete_all_auth_descriptors_except_main(account) {
+    val main = main_auth_descriptor @ { account } ( .auth_descriptor );
+    delete (ads: auth_descriptor_signer, ad: account_auth_descriptor) @* {
+        ad.account == account,
+        ad != main,
+        ads.account_auth_descriptor == ad
+    };
+
+    delete account_auth_descriptor @* {
+       .account == account,
+       $ != main
+    };
+}
+
+function create_account_with_auth(auth_descriptor, account_id: byte_array? = null): account {
+    require(auth_descriptor.rules == GTV_NULL, "Cannot create an account with a restricted auth descriptor");
+    require_mandatory_flags(auth_descriptor);
+
+    val id = account_id ?: get_account_id_from_signers(get_signers(auth_descriptor));
+    val account = create account(id, type = ACCOUNT_TYPE_USER);
+
+    val main = add_auth_descriptor(account, auth_descriptor);
+    create main_auth_descriptor(account, main);
+
+    create_rate_limiter_state_for_account(account);
+    
+    return account;
+}
+
+function require_mandatory_flags(auth_descriptor) {
+    var flags = get_flags(auth_descriptor);
+    val mandatory = get_auth_flags_config().mandatory;
+    require(
+        flags.contains_all(mandatory),
+        "Some of mandatory flags &lt;%s&gt; missing, found only &lt;%s&gt;".format(mandatory, flags)
+    );
+}
+
+/**
+ * Creates an account without auth descriptor. Used to create different "system" account types,
+ * that cannot be directly accessed, e.g. POOL, FEE, BLOCKCHAIN, ... accounts.
+ * 
+ * @param account_id    account id
+ * @param type          account type specified as a free form text. Usually uppercase.
+ */
+function create_account_without_auth(account_id: byte_array, type: text): account {
+    return create account(
+        id = account_id,
+        type = type
+    );
+}
+
+/**
+ * Finds or creates an account of specific type.
+ *
+ * @param account_id    account id
+ * @param type          account type 
+ */
+function ensure_account_without_auth(account_id: byte_array, type: text): account {
+    val account = account @? { .id == account_id };
+    if (account??) {
+        require(
+            account.type == type,
+            "Found account &lt;%s&gt; of invalid type. Expected &lt;%s&gt;, found &lt;%s&gt;".format(account.id, type, account.type)
+        );
+
+        return account;
+    } else {
+        return create_account_without_auth(account_id, type);
+    }
+}
+
+function get_flags(auth_descriptor) {
+    return when (auth_descriptor.auth_type) {
+        S -&gt; single_sig_args.from_gtv(auth_descriptor.args.to_gtv()).flags;
+        M -&gt; multi_sig_args.from_gtv(auth_descriptor.args.to_gtv()).flags;
+    };
+}
+
+/**
+* Checks if an `account_auth_descriptor` has all the specified flags
+*/
+function has_flags(account_auth_descriptor, required_flags: list&lt;text&gt;): boolean {
+    val flags = get_flags_from_args(account_auth_descriptor.auth_type, account_auth_descriptor.args);
+    return flags.contains_all(required_flags);
+}
+
+function add_signers(account, auth_descriptor, account_auth_descriptor) {
+    create auth_descriptor_signer(
+        get_signers(auth_descriptor) @* {}
+            (struct&lt;auth_descriptor_signer&gt;(account_auth_descriptor, id = $))
+    );
+}
+
+function get_account_id_from_signers(signers: list&lt;byte_array&gt;) {
+    require(signers.size() &gt; 0, "Cannot derive account id. Signers list is empty");
+    return if (signers.size() == 1) signers[0].hash() else signers @* {} (@sort $).hash();
+}
+
+function auth_descriptor_by_id(account, id: byte_array) = require(
+    account_auth_descriptor @? { account, id },
+    "Auth descriptor '%s' not found for account '%s'".format(id, account.id)
+);
+
+function account_by_id(id: byte_array) = require(
+    account @? { id },
+    "Account not found: '%s'".format(id)
+);
+
+function single_sig_auth_descriptor(signer: byte_array, flags: set&lt;text&gt;) = auth_descriptor(
+    auth_type = auth_type.S,
+    args = list&lt;gtv&gt;.from_gtv(single_sig_args(
+        flags = flags,
+        signer = signer
+    ).to_gtv()),
+    GTV_NULL
+);
+
+function multi_sig_auth_descriptor(signers: list&lt;byte_array&gt;, signatures_required: integer, flags: set&lt;text&gt;) = auth_descriptor(
+    auth_type = auth_type.M,
+    args = list&lt;gtv&gt;.from_gtv(multi_sig_args(
+        signers = signers,
+        signatures_required = signatures_required,
+        flags = flags
+    ).to_gtv()),
+    GTV_NULL
+);
+
+function get_auth_descriptors(id: byte_array) {
+    return account_auth_descriptor @* {
+        .account.id == id
+    } (
+        get_auth_descriptor_data($.to_struct())
+    );
+}
+
+function get_auth_descriptors_by_signer(account_id: byte_array, signer: byte_array) {
+    return auth_descriptor_signer @* {
+        .account_auth_descriptor.account.id == account_id,
+        .id == signer
+    } (
+        get_auth_descriptor_data(.account_auth_descriptor.to_struct())
+    );
+}
+
+function get_auth_descriptor_data(ad: struct&lt;account_auth_descriptor&gt;) {
+    return (
+        id = ad.id,
+        account_id = ad.account.id,
+        auth_type = ad.auth_type,
+        args = gtv.from_bytes(ad.args),
+        rules = gtv.from_bytes(ad.rules),
+        created = ad.created
+    );
+}
+
+function get_paginated_accounts_by_signer(id: byte_array, page_size: integer?, page_cursor: text?) {
+    val before_rowid = utils.before_rowid(page_cursor);
+    return auth_descriptor_signer @* {
+        id,
+        .rowid &gt; (before_rowid ?: rowid(0))
+    } (
+        utils.pagination_result(
+            data=.account_auth_descriptor.account.to_struct().to_gtv_pretty(),
+            rowid=.rowid
+        )
+    ) limit utils.fetch_data_size(page_size); 
+}
+
+function get_paginated_accounts_by_ad_id(id: byte_array, page_size: integer?, page_cursor: text?) {
+    val before_rowid = utils.before_rowid(page_cursor);
+    return account_auth_descriptor @* {
+        .id == id,
+        .rowid &gt; (before_rowid ?: rowid(0))
+    } (
+        utils.pagination_result(
+            data=.account.id.to_gtv_pretty(),
+            rowid=.rowid
+        )
+    ) limit utils.fetch_data_size(page_size);
+}
+
+function get_paginated_accounts_by_type(type: text, page_size: integer?, page_cursor: text?) {
+    val before_rowid = utils.before_rowid(page_cursor);
+    return account @* {
+        .type == type,
+        .rowid &gt; (before_rowid ?: rowid(0))
+    } (
+        utils.pagination_result(
+            data = .id.to_gtv(),
+            rowid = .rowid
+        )
+    ) limit utils.fetch_data_size(page_size);    
+}
+
+function validate_auth_descriptor_args(auth_descriptor) {
+    when (auth_descriptor.auth_type) {
+        S -&gt; single_sig_args.from_gtv(auth_descriptor.args.to_gtv());
+        M -&gt; {
+            val args = multi_sig_args.from_gtv(auth_descriptor.args.to_gtv());
+            require(args.signatures_required &gt; 0, "Required signatures must be positive");
+            require(args.signatures_required &lt;= args.signers.size(), "Required signatures cannot be greater than number of signers");
+        }
+    }
+}
+
+function get_max_allowed_auth_descriptor_rules() = chain_context.args.auth_descriptor.max_rules;
+</string>
+                            </entry>
+                            <entry key="lib/ft4/core/accounts/rate_limit.rell">
+                                <string>/**
+ * Extend this function to have different rate limiting for different accounts.
+ *
+ * @param account  the account
+ *
+ * @return rate limit configuration for the account, or `null` to use default config from blockchain configuration.
+ */
+@extendable
+function account_rate_limit_config(account): rate_limit_config? = null;
+
+function rate_limit(account) {
+    val rl_config = get_rate_limit_config_for_account(account);
+
+    if (rl_config.active == false) return;
+    
+    val max_counter = rl_config.max_points;
+    val recovery_time = rl_config.recovery_time;
+    val stat = require(
+        rl_state@?{account} (.points, .last_update), 
+        "Rate limiter state not found for the account with ID: %s".format(account.id)
+    );
+    val delta = utils.latest_time() - stat.last_update;
+    var got_points = 0;
+    var update_time = stat.last_update;
+
+    if (delta &gt; recovery_time) {
+        got_points = delta / recovery_time;
+        update_time = stat.last_update + got_points * recovery_time;
+        if (got_points + stat.points &gt; max_counter) {
+            got_points = max_counter - stat.points;
+            // if user is at maximum reset his timer
+            update_time = utils.latest_time();
+        }
+    }
+    
+    require(stat.points + got_points &gt; 0, "Insufficient rate limiter points");
+    
+    update rl_state @ { account } (
+        .points += got_points - 1,
+        .last_update = update_time
+    );
+}
+
+function current_rate_limit_points(rate_limit_config, rl_state, current_timestamp: timestamp) {
+    val delta = current_timestamp - rl_state.last_update;
+    return if (delta &gt; rate_limit_config.recovery_time)
+        min(rate_limit_config.max_points, rl_state.points + delta / rate_limit_config.recovery_time)
+    else
+        rl_state.points;
+}
+
+function add_rate_limit_points(account, amount: integer) {
+    val state = require(
+        rl_state @? { account }, 
+        "Rate limiter state not found for the account with ID: %s".format(account.id)
+    );
+    val config = get_rate_limit_config_for_account(account);
+	state.points = min(state.points + amount, config.max_points);
+}
+
+function get_rate_limit_config(): rate_limit_config = chain_context.args.rate_limit;
+
+function get_rate_limit_config_for_account(account): rate_limit_config =
+    if (chain_context.args.rate_limit.active == false)
+        chain_context.args.rate_limit
+    else
+        account_rate_limit_config(account) ?: chain_context.args.rate_limit;
+
+function create_rate_limiter_state_for_account(account) {
+    val rl_config = get_rate_limit_config_for_account(account);
+
+    val max_points = rl_config.max_points;
+    val recovery_time = rl_config.recovery_time;
+    val points_at_start = min(rl_config.points_at_account_creation, rl_config.max_points);
+    
+    create rl_state(account, .points = points_at_start, .last_update = utils.latest_time(), recovery_time);
+}</string>
+                            </entry>
+                            <entry key="lib/ft4/core/accounts/strategies/auth_message.rell">
+                                <string>
+function get_register_account_message(
+    strategy_operation: gtx_operation,
+    register_account_operation: gtx_operation
+) {
+    val strategy = get_strategy(strategy_operation.name);
+
+    val account_details = strategy.account_details(strategy_operation.args.to_gtv());
+
+    var message = "Blockchain: %s\n\nPlease sign the message to register account\n\nAccount ID:\n%s\n\n"
+        .format(
+            chain_context.blockchain_rid,
+            account_details.account_id
+        );
+
+    message = message + auth_message_operation_details(register_account_operation);
+    message = message + auth_message_auth_descriptors_details(account_details.main, account_details.disposable);
+
+    return message;
+}
+
+function auth_message_operation_details(op: gtx_operation): text {
+    var message = "Operation:\n%s\n\n".format(op.name);
+    if (op.args.size() &gt; 0) {
+        message = message + "Parameters:\n";
+        for (parameter in op.args) {
+            message = message + "- %s\n".format(parameter);
+        }
+        message = message + "\n\n";
+    }
+    return message;
+}
+
+function auth_message_auth_descriptors_details(
+    main: accounts.auth_descriptor, 
+    disposable: accounts.auth_descriptor? = null
+): text {
+    var message = "Main:\n" + auth_message_auth_descriptor(main);
+
+    if (disposable??) {
+        message = message + "\n\nDisposable:\n" + auth_message_auth_descriptor(disposable);
+    }
+
+    return message;
+}
+
+function auth_message_auth_descriptor(accounts.auth_descriptor)
+    = when (auth_descriptor.auth_type) {
+        S -&gt; auth_message_single_sig(accounts.single_sig_args.from_gtv(auth_descriptor.args.to_gtv()));
+        M -&gt; auth_message_multi_sig(accounts.multi_sig_args.from_gtv(auth_descriptor.args.to_gtv()));
+    };
+
+function auth_message_single_sig(args: accounts.single_sig_args)
+    = "Signer:\n%s\n\nFlags:\n%s\n".format(args.signer, args.flags);
+
+function auth_message_multi_sig(args: accounts.multi_sig_args) {
+    var message = "Signers:\n";
+    for (signer in args.signers) {
+        message = message + signer + "\n";
+    }
+    message = message + "\nRequired signatures: %d\n\n".format(args.signatures_required);
+    return message + "Flags:\n%s".format(args.flags);
+}
+</string>
+                            </entry>
+                            <entry key="lib/ft4/core/accounts/strategies/module.rell">
+                                <string>@mount("ft4")
+module;
+
+import ^^^.core.accounts;
+import ^^^.core.auth;
+
+function get_strategy(strategy_name: name): _strategy {
+    val strategies = strategy();
+    require(strategy_name in strategies, "Strategy &lt;%s&gt; is not loaded or does not exist.".format(strategy_name));
+    return strategies[strategy_name];
+}
+
+function is_strategy_op(op: gtx_operation): boolean {
+    val strategy_operations = strategy().values() @* {} ($.op.mount_name);
+    return op.name in strategy_operations;
+}
+
+function register_account(): accounts.account {
+    val tx_operations = op_context.get_all_operations();
+    val strategy_op = tx_operations[op_context.op_index-1];
+    val strategy_name = strategy_op.name;
+    val strategy_params = strategy_op.args.to_gtv();
+
+    val strategy = get_strategy(strategy_name);
+    val account_details = strategy.account_details(strategy_params);
+
+    var signers = accounts.get_signers(account_details.main);
+    if (account_details.disposable??) {
+        signers.add_all(accounts.get_signers(account_details.disposable!!));
+    }
+
+    val message = get_register_account_message(strategy_op, op_context.get_current_operation());
+    auth.verify_signers_with_message(signers, message);
+
+    val account_id = account_details.account_id;
+
+    before_register_account(account_id);
+
+    val account = accounts.create_account_with_auth(account_details.main, account_id);
+    if (account_details.disposable??) {
+        accounts.add_auth_descriptor(account, account_details.disposable!!);
+    }
+
+    strategy.action(account, strategy_params);
+
+    after_register_account(account);
+
+    return account;
+}
+
+@extendable function before_register_account(account_id: byte_array);
+
+@extendable function after_register_account(accounts.account);
+
+@extendable 
+function strategy(): map&lt;name, _strategy&gt;;
+
+struct _strategy {
+    op: rell.meta;
+    account_details: (gtv) -&gt; account_details;
+    action: (accounts.account, gtv) -&gt; unit;
+}
+
+struct account_details {
+    account_id: byte_array;
+    main: accounts.auth_descriptor;
+    disposable: accounts.auth_descriptor? = null;
+}
+
+function add_strategy(op: rell.meta, account_details: (gtv) -&gt; account_details, action: ((accounts.account, gtv) -&gt; unit)? = null)
+    = [op.mount_name: _strategy(op, account_details, action ?: _no_action(*))];
+
+function _no_action(accounts.account, strategy_params: gtv) {}
+
+function require_register_account_next_operation() {
+    val all_operations = op_context.get_all_operations();
+    val this_op = op_context.get_all_operations()[op_context.op_index];
+    
+    require(
+        all_operations.size() &gt; op_context.op_index + 1,
+        "&lt;%s&gt; must be followed by a register account operation".format(this_op.name)
+    );
+    
+    val next_op = all_operations[op_context.op_index + 1];
+
+    require(
+        auth.is_evm_signatures_authorized_operation(next_op.name),
+        "&lt;%s&gt; operation must be followed by a register account operation, not &lt;%s&gt;".format(this_op.name, next_op.name)
+    );
+}
+</string>
+                            </entry>
+                            <entry key="lib/ft4/core/accounts/strategies/open/module.rell">
+                                <string>@mount("ft4")
+module;
+
+import ^^^^.core.accounts;
+import ^^^^.core.accounts.strategies;
+
+operation ras_open(
+    main: accounts.auth_descriptor,
+    disposable: accounts.auth_descriptor? = null
+) {
+    strategies.require_register_account_next_operation();
+}
+
+function account_details(gtv) {
+    val params = struct&lt;ras_open&gt;.from_gtv(gtv);
+    val signers = accounts.get_signers(params.main);
+    return strategies.account_details(
+        account_id = accounts.get_account_id_from_signers(signers),
+        main = params.main,
+        disposable = params.disposable
+    );
+}
+
+@extend(strategies.strategy)
+function () = strategies.add_strategy(
+    op = rell.meta(ras_open),
+    account_details = account_details(*)
+);
+</string>
+                            </entry>
+                            <entry key="lib/ft4/core/auth/authentication.rell">
+                                <string>/**
+ * This function can be extended by users to add custom logic before authentication.
+ */
+@extendable
+function before_authenticate(accounts.account, accounts.account_auth_descriptor);
+
+/**
+ * This function can be extended by users to add custom logic after authentication.
+ */
+@extendable
+function after_authenticate(accounts.account, accounts.account_auth_descriptor?);
+
+val EVM_AUTH_OP = "ft4.evm_auth";
+val FT_AUTH_OP = "ft4.ft_auth";
+
+val EVM_ADDRESS_SIZE = 20;
+val FT_PUBKEY_SIZE = 33;
+
+val BLOCKCHAIN_RID_PLACEHOLDER = "{blockchain_rid}";
+val ACCOUNT_ID_PLACEHOLDER = "{account_id}";
+val AUTH_DESCRIPTOR_ID_PLACEHOLDER = "{auth_descriptor_id}";
+val NONCE_PLACEHOLDER = "{nonce}";
+
+function authenticate() {
+    val op = op_context.get_current_operation();
+    require(op_context.op_index &gt; 0, "Expected at least two operations, make sure that you included auth operation.");
+
+    val previous_op = op_context.get_all_operations()[op_context.op_index - 1];
+    require(
+        is_auth_op(previous_op),
+        "Error authorizing operation. Incorrect auth operation %s".format(previous_op.name)
+    );
+
+    val (account, auth_descriptor) = fetch_account_and_auth_descriptor(previous_op.args);
+    require(
+        get_first_allowed_auth_descriptor(op.name, op.args.to_gtv(), account.id, [auth_descriptor.id]),
+        "The provided auth descriptor is not valid for this operation"
+    );
+    before_authenticate(account, auth_descriptor);
+
+    accounts.rate_limit(account);
+
+    require(not accounts.have_violating_rules(auth_descriptor), "The rules for this auth descriptor have been violated");
+
+    val flags = get_auth_flags(op.name);
+
+    when (previous_op.name) {
+        EVM_AUTH_OP -&gt; _validate_evm_signature(op, previous_op, flags, account, auth_descriptor);
+        FT_AUTH_OP -&gt; _validate_ft4_signature(flags, account, auth_descriptor);
+        else -&gt; require(false, "Invalid auth operation: %s".format(previous_op.name));
+    };
+
+    val auth_desc_after = accounts.update_auth_descriptor_rule_variables(auth_descriptor);
+    val deleted_descriptors = accounts.delete_expired_auth_descriptors(account);
+
+    after_authenticate(account, if (auth_desc_after in deleted_descriptors) null else auth_desc_after);
+
+    return account;
+}
+
+function get_first_allowed_auth_descriptor_by_signers(op_name: name, args: gtv, account_id: byte_array, signers: list&lt;byte_array&gt;) {
+    val ads = accounts.auth_descriptor_signer @* {
+        .account_auth_descriptor.account.id == account_id,
+        .id in signers
+    } (.account_auth_descriptor);
+
+    val flags = get_auth_flags(op_name);
+
+    val valid_ad_ids = ads @* { accounts.has_flags($, flags) } (.id);
+
+    return get_first_allowed_auth_descriptor(op_name, args, account_id, valid_ad_ids);
+}
+
+function get_first_allowed_auth_descriptor(op_name: name, args: gtv, account_id: byte_array, ad_ids: list&lt;byte_array&gt;) {
+    if (ad_ids.size() == 0) return null;
+
+    val resolver = get_auth_handler(op_name).resolver;
+    if (resolver == null) return ad_ids[0];
+  
+    return resolver(args, account_id, ad_ids);
+}
+
+function fetch_account_and_auth_descriptor(auth_args: list&lt;gtv&gt;): (accounts.account, accounts.account_auth_descriptor) {
+    val (account_id, auth_descriptor_id) = extract_account_and_auth_descriptor(auth_args);
+    val account = accounts.Account(account_id);
+    val auth_descriptor = require(
+        try_fetch_auth_descriptor(account, auth_descriptor_id),
+        "Auth descriptor '%s' not found for account '%s'".format(auth_descriptor_id, account_id)
+    );
+    return (account, auth_descriptor);
+}
+
+function extract_account_and_auth_descriptor(auth_args: list&lt;gtv&gt;): (byte_array, byte_array) {
+    val account_id = byte_array.from_gtv(auth_args[0]);
+    val auth_descriptor_id = byte_array.from_gtv(auth_args[1]);
+    return (account_id, auth_descriptor_id);
+}
+
+function try_fetch_auth_descriptor(accounts.account, auth_descriptor_id: byte_array): accounts.account_auth_descriptor? =
+    accounts.account_auth_descriptor @? { .id == auth_descriptor_id, .account == account };
+
+function get_auth_flags(op_name: name) = get_auth_handler(op_name).flags;
+
+function get_auth_message_template(op_name: name, op_args: gtv?) {
+    val formatter = get_auth_handler(op_name).message_formatter;
+
+    val args = if (op_args == null) list&lt;gtv&gt;() else list&lt;gtv&gt;.from_gtv(op_args);
+
+    val message = if (formatter??) formatter(args.to_gtv()) else generate_operation_auth_message(chain_context.blockchain_rid, gtx_operation(
+        name = op_name,
+        args = args
+    ));
+
+    return utils.make_auth_message(message);
+}
+
+function _validate_evm_signature(
+  op: gtx_operation,
+  auth_op: gtx_operation,
+  flags: list&lt;text&gt;,
+  account: accounts.account,
+  auth_descriptor: accounts.account_auth_descriptor
+) {
+    val message_template = get_auth_message_template(op.name, op.args.to_gtv());
+    val validated_args = _validate_evm_arguments(auth_op.args, set(flags), account, auth_descriptor);
+    val message = create_message_from_template(
+        validated_args, 
+        message_template, 
+        op.args, 
+        utils.derive_nonce(op, auth_descriptor.ctr)
+    );
+
+    if (auth_descriptor.auth_type == accounts.auth_type.S)
+        _validate_evm_address(message, validated_args.signatures[0], auth_descriptor);
+    else
+        _validate_multiple_evm_addresses(message, validated_args.signatures, auth_descriptor);
+}
+
+function create_message_from_template(evm_auth_args, message_template: text, args: list&lt;gtv&gt;, nonce: text): text {
+    require(message_template.contains(NONCE_PLACEHOLDER), "Message template has to include '%s'".format(NONCE_PLACEHOLDER));
+    require(message_template.contains(BLOCKCHAIN_RID_PLACEHOLDER), "Message template has to include '%s'".format(BLOCKCHAIN_RID_PLACEHOLDER));
+    var message = message_template;
+    
+    return message
+        .replace(ACCOUNT_ID_PLACEHOLDER, evm_auth_args.account.id.to_hex().upper_case())
+        .replace(AUTH_DESCRIPTOR_ID_PLACEHOLDER, evm_auth_args.account_auth_descriptor.id.to_hex().upper_case())
+        .replace(NONCE_PLACEHOLDER, nonce)
+        .replace(BLOCKCHAIN_RID_PLACEHOLDER, chain_context.blockchain_rid.to_hex().upper_case());
+}
+
+function _validate_evm_arguments(
+  auth_args: list&lt;gtv&gt;,
+  required_flags: set&lt;text&gt;,
+  account: accounts.account, 
+  auth_descriptor: accounts.account_auth_descriptor
+): evm_auth_args {
+    require(auth_args.size() == 3, "Incorrect number of arguments to auth operation");
+
+    val signatures = list&lt;signature?&gt;.from_gtv(auth_args[2]);
+
+    val has_all_flags = accounts.has_flags(auth_descriptor, list(required_flags));
+    
+    require(has_all_flags, "The auth descriptor does not have the required permissions");
+
+    return evm_auth_args(account, auth_descriptor, signatures);
+}
+
+function _validate_ft4_signature(
+  flags: list&lt;text&gt;,
+  account: accounts.account,
+  auth_descriptor: accounts.account_auth_descriptor
+) {
+   	val result: utils.validation_result = accounts.check_auth_args(
+        auth_descriptor.auth_type,
+        auth_descriptor.args,
+        accounts.get_signers_from_encoded_auth_descriptor(auth_descriptor.auth_type, auth_descriptor.args),
+        flags
+   	);
+
+    require(result.valid, result.error!!); // Prints a precise error message.
+}
+
+function _recover_evm_address(message: text, signature) {
+    require(message != "", "Empty messages are not allowed");
+
+    val msg_hash = _evm_message_hash(message);
+    val evm_pubkey = crypto.eth_ecrecover(
+        signature.r,
+        signature.s,
+        signature.v - 27,
+        msg_hash
+    );
+    
+    return crypto.eth_pubkey_to_address(evm_pubkey);
+}
+
+function _evm_message_hash(message: text): byte_array =
+    keccak256(("\u0019Ethereum Signed Message:\n" + message.to_bytes().size().to_text() + message).to_bytes());
+
+function _validate_evm_address(message: text, signature?, accounts.account_auth_descriptor) {
+    require(signature, "Signature cannot be null when using single sig");
+    val recovered_address = _recover_evm_address(message, signature);
+    val signer = accounts.auth_descriptor_signer @? {
+        .account_auth_descriptor == account_auth_descriptor,
+        .id == recovered_address
+    };
+    require(signer, "Invalid signature on message: \n%s".format(message));
+
+    return recovered_address;
+}
+
+function _validate_multiple_evm_addresses(message: text, signatures: list&lt;signature?&gt;, accounts.account_auth_descriptor) {
+    val recovered_keys = list&lt;byte_array&gt;();
+    val ad_args = accounts.multi_sig_args.from_bytes(account_auth_descriptor.args);
+    for (i in range(signatures.size())) {
+        if (signatures[i] == null) continue;
+
+        val recovered_address = _validate_evm_address(
+            message,
+            signatures[i],
+            account_auth_descriptor
+        );
+        require(
+            recovered_address == ad_args.signers[i],
+            "Expected signer at index &lt;%d&gt; to be &lt;%s&gt; but was: &lt;%s&gt;"
+                .format(i, ad_args.signers[i], recovered_address)
+        );
+        recovered_keys.add(recovered_address);
+    }
+    require(
+        recovered_keys.size() &gt;= ad_args.signatures_required, 
+        "Minimum number of valid signatures not reached. Expected &lt;%d&gt;, found &lt;%d&gt;."
+            .format(ad_args.signatures_required, recovered_keys.size())
+    );
+    return recovered_keys;
+}
+
+/**
+  * Verifies whether provided list of signers have signed the operation/transaction.
+  * FT (GTX) signers are checked against GTX `signers` and `signatures` fields, while 
+  * EVM signers are checked against signers and signatures provided in `ft4.evm_signatures` operation.
+  */
+function verify_signers(ft_and_evm_signers: list&lt;byte_array&gt;) {
+    val op = op_context.get_current_operation();
+    val message_template = get_auth_message_template(op.name, op.args.to_gtv());
+
+    var message = message_template
+        .replace(BLOCKCHAIN_RID_PLACEHOLDER, chain_context.blockchain_rid.to_hex().upper_case())
+        .replace(NONCE_PLACEHOLDER, utils.derive_nonce(op, 0));
+
+    if (message_template.contains(ACCOUNT_ID_PLACEHOLDER) or message_template.contains(AUTH_DESCRIPTOR_ID_PLACEHOLDER)) {
+        val auth_details = require(
+            get_auth_details_from_auth_operation(),
+            "Cannot extract auth details. Auth operation not found"
+        );
+        
+        message = message
+            .replace(ACCOUNT_ID_PLACEHOLDER, auth_details.account_id.to_hex().upper_case())
+            .replace(AUTH_DESCRIPTOR_ID_PLACEHOLDER, auth_details.auth_descriptor_id.to_hex().upper_case());
+    }
+
+    verify_signers_with_message(ft_and_evm_signers, message);
+}
+
+function verify_signers_with_message(ft_and_evm_signers: list&lt;byte_array&gt;, message: text) {
+    val (signers, signatures) = get_evm_signatures();
+    for (i in range(signatures.size())) {
+        val signer = signers[i];
+        require(
+            signer == _recover_evm_address(message, signatures[i]),
+            "Invalid signature for address &lt;%s&gt;".format(signer)
+        );
+    }
+
+    val evm_signers = set(signers);
+
+    for (signer in ft_and_evm_signers) {
+        if (signer.size() == EVM_ADDRESS_SIZE) require(signer in evm_signers, "Missing signature for address &lt;%s&gt;".format(signer));
+        else if (signer.size() == FT_PUBKEY_SIZE) require(op_context.is_signer(signer), "Missing signature for public key &lt;%s&gt;".format(signer));
+        else require(false, "Unsupported signer &lt;%s&gt;".format(signer));
+    }
+}
+
+function get_evm_signatures(): (signers: list&lt;byte_array&gt;, signatures: list&lt;signature&gt;) {
+    if (op_context.op_index == 0) return (signers = list&lt;byte_array&gt;(), signatures = list&lt;signature&gt;());
+
+    val tx_operations = op_context.get_all_operations();
+    val prev_op = tx_operations[op_context.op_index-1];
+    var evm_signatures_op: gtx_operation? = null;
+    
+    if (is_evm_signatures_op(prev_op)) {
+        evm_signatures_op = prev_op;
+    } else if (
+        op_context.op_index &gt; 1 and
+        (is_auth_op(prev_op) or strategies.is_strategy_op(prev_op)) and 
+        is_evm_signatures_op(tx_operations[op_context.op_index-2])
+    ) {
+        evm_signatures_op = tx_operations[op_context.op_index-2];
+    }
+
+    if (empty(evm_signatures_op)) return (signers = list&lt;byte_array&gt;(), signatures = list&lt;signature&gt;());
+
+    val args = struct&lt;evm_signatures&gt;.from_gtv(evm_signatures_op.args.to_gtv());
+
+    require(
+        args.signers.size() == args.signatures.size(),
+        "Number of evm signers &lt;%d&gt; is not equal to number of evm signatures &lt;%d&gt;".format(args.signers.size(), args.signatures.size())
+    );
+
+    var signatures = list&lt;signature&gt;();
+    for (i in range(args.signatures.size())) {
+        val signature = require(
+            args.signatures[i],
+            "Missing signature for address &lt;%s&gt;.".format(args.signers[i])
+        );
+        signatures.add(signature);
+    }
+
+    return (
+        signers = args.signers,
+        signatures = signatures
+    );
+}
+
+function extract_account_id(auth_op: gtx_operation): byte_array {
+    require(is_auth_op(auth_op), "Operation %s is not an auth operation".format(auth_op.name));
+    require(auth_op.args.size() &gt;= 1, "Invalid auth op, insufficient number of args: %s".format(auth_op.args.size()));
+    return byte_array.from_gtv(auth_op.args[0]);
+}
+
+function is_auth_op(op: gtx_operation) = op.name in [EVM_AUTH_OP, FT_AUTH_OP];
+
+function is_evm_signatures_op(op: gtx_operation) = op.name == "ft4.evm_signatures";
+
+function get_auth_details_from_auth_operation() {
+    if (op_context.op_index == 0) return null;
+    val op = op_context.get_all_operations()[op_context.op_index-1];
+    if (not is_auth_op(op)) return null;
+
+    return (
+        account_id = byte_array.from_gtv(op.args[0]),
+        auth_descriptor_id = byte_array.from_gtv(op.args[1])
+    );
+}
+</string>
+                            </entry>
+                            <entry key="lib/ft4/core/auth/login.rell">
+                                <string>
+val DEFAULT_LOGIN_CONFIG_NAME = "default";
+
+struct _login_config {
+    flags: list&lt;text&gt;;
+    rules: gtv? = null;
+}
+
+@extendable
+function login_config(): map&lt;name, _login_config&gt;;
+
+function add_login_config(
+    name = DEFAULT_LOGIN_CONFIG_NAME,
+    flags: list&lt;text&gt;,
+    rules: gtv? = null
+) {
+    return [name: _login_config(flags, rules)];
+}
+
+function map_rule(rule: rule_expression): gtv {
+    return [
+        rule.operator.name.to_gtv(),
+        rule.variable.name.to_gtv(),
+        rule.value.to_gtv()
+    ].to_gtv();
+}
+
+function login_simple_rule(rule: rule_expression) = map_rule(rule);
+
+function login_rules(rules_list: list&lt;rule_expression&gt;): gtv {
+    require(rules_list.size() &gt; 0, "Empty login rules list");
+
+    if (rules_list.size() == 1) return map_rule(rules_list[0]);
+    
+    val rules = ["and".to_gtv()];
+    for (rule in rules_list) {
+        rules.add(map_rule(rule));
+    }
+    return rules.to_gtv();
+}
+
+function ttl(millis: integer): gtv {
+    return map_rule(
+        rule_expression(
+            rule_operator.lt,
+            rule_variable.relative_block_time,
+            millis
+        )
+    );
+}
+
+enum rule_variable {
+    block_height,
+    block_time,
+    op_count,
+    relative_block_height,
+    relative_block_time
+}
+
+enum rule_operator {
+    lt,
+    le,
+    eq,
+    ge,
+    gt
+}
+
+struct rule_expression {
+	operator: rule_operator;
+	variable: rule_variable;
+	value: integer;
+}
+
+struct rule_parameters {
+	variable: rule_variable;
+	value: integer;
+}
+
+/*
+ * Operator functions
+ */
+
+function greater_than(rule_parameters) = rule_expression(
+    rule_parameters.variable,
+    rule_operator.gt,
+    rule_parameters.value
+);
+
+function greater_or_equal(rule_parameters) = rule_expression(
+    rule_parameters.variable,
+    rule_operator.ge,
+    rule_parameters.value
+);
+
+function equals(rule_parameters): rule_expression {
+    return rule_expression(
+        rule_parameters.variable,
+        rule_operator.eq,
+        rule_parameters.value
+    );
+}
+
+function less_than(rule_parameters) = rule_expression(
+    rule_parameters.variable,
+    rule_operator.lt,
+    rule_parameters.value
+);
+
+function less_or_equal(rule_parameters) = rule_expression(
+    rule_parameters.variable,
+    rule_operator.le,
+    rule_parameters.value
+);
+
+/*
+ * Rule variable functions
+ */
+
+function block_height(integer) = rule_parameters(
+    rule_variable.block_height,
+    integer
+);
+
+function block_time(integer) = rule_parameters(
+    rule_variable.block_time,
+    integer
+);
+
+function op_count(integer) = rule_parameters(
+    rule_variable.op_count,
+    integer
+);
+
+function relative_block_height(integer) = rule_parameters(
+    rule_variable.relative_block_height,
+    integer
+);
+
+function relative_block_time(integer) = rule_parameters(
+    rule_variable.relative_block_time,
+    integer
+);
+</string>
+                            </entry>
+                            <entry key="lib/ft4/core/auth/module.rell">
+                                <string>@mount('ft4')
+module;
+
+import ^^.core.accounts;
+import ^^.core.accounts.strategies;
+import ^^.utils;
+import ^^.version;
+
+import ^^.external.auth.{
+    evm_signatures
+};
+
+struct module_args {
+    evm_signatures_authorized_operations: gtv? = null;
+}
+
+struct auth_data {
+    flags: list&lt;text&gt;;
+    message: text;
+}
+
+struct _auth_handler {
+    flags: list&lt;text&gt;;
+    message_formatter: ((gtv) -&gt; text)? = null;
+    resolver: ((gtv, byte_array, list&lt;byte_array&gt;) -&gt; byte_array?)? = null;
+}
+
+/*
+ * The constant that defines app level authentication scope.
+ * If scope is omitted when defining an auth handler, then
+ * it has 'app' scope, i.e. it is used to authenticate 
+ * operations that do not have own auth handlers or if 
+ * there is no mount point auth handler for the operation.
+ */
+val APP_SCOPE = "app";
+
+/*
+ * Extendable function used to define auth handlers. 
+ * When called it returns a list of all auth handlers defined
+ * in the dapp.
+ */
+@extendable 
+function auth_handler(): map&lt;name, _auth_handler&gt;;
+
+/*
+ * Finds auth handler for provided operation name.
+ */
+function get_auth_handler(op_name: name) {
+    require_valid_scope_name(op_name);
+    val auth_handlers = auth_handler();
+    if (op_name in auth_handlers) return auth_handlers[op_name];
+    val override_name = "__override__" + op_name;
+    if (override_name in auth_handlers) return auth_handlers[override_name];
+
+    val handler = get_mount_scope_auth_handler(auth_handlers, op_name);
+    if (handler??) return handler;
+
+    require(
+        auth_handlers.get_or_null(APP_SCOPE),
+        "Cannot find auth handler for operation &lt;%s&gt;".format(op_name)
+    );
+    return auth_handlers[APP_SCOPE];
+}
+
+function add_auth_handler(
+    scope: text = APP_SCOPE, 
+    flags: list&lt;text&gt;,
+    message: ((gtv) -&gt; text)? = null,
+    resolver: ((gtv, byte_array, list&lt;byte_array&gt;) -&gt; byte_array?)? = null
+) = [valid_scope_name(scope): _auth_handler(flags, message, resolver)];
+
+function add_overridable_auth_handler(
+    scope: text = APP_SCOPE,
+    flags: list&lt;text&gt;,
+    message: ((gtv) -&gt; text)? = null,
+    resolver: ((gtv, byte_array, list&lt;byte_array&gt;) -&gt; byte_array?)? = null
+) = ["__override__" + valid_scope_name(scope): _auth_handler(flags, message, resolver)];
+
+function valid_scope_name(scope: text) {
+    val scope_name = scope.trim();
+    require_valid_scope_name(scope_name);
+    return scope_name;
+}
+
+function args() = op_context.get_current_operation().args.to_gtv();
+
+struct signature {
+    r: byte_array;
+    s: byte_array;
+    v: integer;
+}
+
+struct evm_auth_args {
+    accounts.account;
+    accounts.account_auth_descriptor;
+    signatures: list&lt;signature?&gt;;
+}
+
+function get_mount_scope_auth_handler(auth_handlers: map&lt;name, _auth_handler&gt;, op_name: name) {
+    val op_name_components = op_name.split(".");
+    if (op_name_components.size() &lt; 2) return null;
+    
+    for (count in range(op_name_components.size()-1, 0, -1)) {
+        val mount_point = join_text_list(op_name_components, count);
+        if (mount_point in auth_handlers) return auth_handlers[mount_point];
+    }
+
+    return null;
+}
+
+/*
+ * Creates message from operation name and arguments.
+ * It is used when `evm_auth` is used to authenticate a user, 
+ * but auth message is not specified in the auth handler of the operation.
+ */
+function generate_operation_auth_message(blockchain_rid: byte_array, op: gtx_operation) {
+    var message = "Please sign the message to call\noperation:\n- %s".format(op.name);
+
+    if (op.args.size() &gt; 0) {
+        message = message + "\n\n";
+        var arguments = "with arguments:\n";
+        for (arg in op.args) {
+            val argument_value = utils.convert_gtv_to_text(arg);
+
+            arguments = arguments + "- %s\n".format(argument_value);
+        }
+        message = message + arguments.sub(0, arguments.size() - 1);
+    }
+    
+    return message;
+}
+
+function join_text_list(components: list&lt;text&gt;, count: integer) {
+    require(count &lt; components.size() and count &gt; 0, "Error building mount path");
+    var result = components[0];
+    for (i in range(1, count)) {
+        result = result + "." + components[i];
+    }
+    return result;
+}
+
+function require_valid_scope_name(name) =     
+    require(
+        name.matches("^\\w+(\\.\\w+)*$"), 
+        "Invalid scope name &lt;%s&gt;".format(name)
+    );
+
+/*
+ * Checks whether `evm_signatures` operation can be used with provided operation.
+ * We don't keep track of nonce for keys used with evm_signatures, therefore if not used with care,
+ * authorizing an operation with `evm_signatures` could lead to replay attack. In order to use it with
+ * an operation, the operation has to be whitelisted. By default, library only allows 
+ * `evm_signatures` to be used with `ft4.add_auth_descriptor` and `ft4.register_account`.
+ * `evm_signatures` is safe to use in combination with `ft_auth` or `evm_auth` operation.
+ * However if used as only way to authorize an operation, then the operation has to ensure that it
+ * cannot be called more than once with same parameters, e.g. operation creates an entity that has id
+ * that is derived from operation parameters.
+ */
+  
+function is_evm_signatures_authorized_operation(name): boolean {
+    val whitelisted_operations = set([
+        "ft4.register_account",
+        "ft4.add_auth_descriptor",
+        "ft4.update_main_auth_descriptor"
+    ]);
+
+    if (chain_context.args.evm_signatures_authorized_operations??) {
+        whitelisted_operations.add_all(require(
+            try_call(set&lt;text&gt;.from_gtv(chain_context.args.evm_signatures_authorized_operations!!, *)),
+            "Cannot parse 'evm_signatures_authorized_operations' config parameter"
+        ));
+    }
+
+    return name in whitelisted_operations;
+}
+
+function require_evm_signatures_can_be_used() {
+    val all_operations = op_context.get_all_operations();
+
+    require(
+        all_operations.size() &gt; op_context.op_index+1,
+        "Cannot find an operation to authorize with 'ft4.evm_signatures'"
+    );
+    var next_op = all_operations[op_context.op_index+1];
+
+    var op_to_authorize: gtx_operation?;
+    if (not (is_auth_op(next_op) or strategies.is_strategy_op(next_op))) {
+        op_to_authorize = next_op;
+    } else {
+        require(
+            all_operations.size() &gt; op_context.op_index+2,
+            "Cannot find an operation to authorize with 'ft4.evm_signatures'"
+        );
+        op_to_authorize = all_operations[op_context.op_index+2];
+    }
+
+    require(
+        is_evm_signatures_authorized_operation(op_to_authorize.name),
+        "Cannot authorize operation &lt;%s&gt; with evm_signatures".format(op_to_authorize.name)
+    );
+}
+
+function require_regular_next_operation() {
+    val all_operations = op_context.get_all_operations();
+    val this_op = op_context.get_all_operations()[op_context.op_index];
+    
+    require(
+        all_operations.size() &gt; op_context.op_index + 1,
+        "&lt;%s&gt; must be followed by an operation to authorize".format(this_op.name)
+    );
+    
+    val next_op = all_operations[op_context.op_index + 1];
+    val prohibited_operations = ["nop", "timeb", "iccf_proof", "ft4.ft_auth", "ft4.evm_auth", "ft4.evm_signatures"];
+    require(not prohibited_operations.contains(next_op.name), "&lt;%s&gt; cannot authorize &lt;%s&gt;".format(this_op.name, next_op.name));
+}
+</string>
+                            </entry>
+                            <entry key="lib/ft4/external/accounts/module.rell">
+                                <string>@mount('ft4')
+module;
+
+import ^^.core.accounts;
+import ^^.core.auth;
+import ^^.utils;
+</string>
+                            </entry>
+                            <entry key="lib/ft4/external/accounts/operations.rell">
+                                <string>
+function delete_auth_descriptor_message(gtv) {
+    val params = struct&lt;delete_auth_descriptor&gt;.from_gtv(gtv);
+    return "Please sign the message\nto delete auth descriptor:\n%s\n\nfrom account\n{account_id}".format(params.auth_descriptor_id);
+}
+
+function delete_auth_descriptor_resolver(args: gtv, account_id: byte_array, auth_descriptor_ids: list&lt;byte_array&gt;) {
+    val params = struct&lt;delete_auth_descriptor&gt;.from_gtv(args);
+    if (params.auth_descriptor_id in auth_descriptor_ids) return params.auth_descriptor_id;
+
+    for (ad in accounts.account_auth_descriptor @* { .account.id == account_id, .id in auth_descriptor_ids }) {
+        if (accounts.has_flags(ad, ["A"])) return ad.id;
+    }
+
+    return null;
+}
+
+@extend(auth.auth_handler)
+function () = auth.add_overridable_auth_handler(
+    scope = rell.meta(delete_auth_descriptor).mount_name,
+    flags = [],
+    message = delete_auth_descriptor_message(*),
+    resolver = delete_auth_descriptor_resolver(*)
+);
+
+operation delete_auth_descriptor(auth_descriptor_id: byte_array) {
+    val account = auth.authenticate();
+    accounts.delete_auth_descriptor(
+        accounts.auth_descriptor_by_id(account, auth_descriptor_id)
+    );
+}
+
+function delete_auth_descriptors_for_signer_message(gtv) {
+    val params = struct&lt;delete_auth_descriptors_for_signer&gt;.from_gtv(gtv);
+    return "Please sign the message\nto delete all auth descriptor for signer:\n%s\n\nfrom account\n{account_id}".format(params.signer);
+}
+
+function delete_auth_descriptors_for_signer_resolver(args: gtv, account_id: byte_array, auth_descriptor_ids: list&lt;byte_array&gt;) {
+    val params = struct&lt;delete_auth_descriptors_for_signer&gt;.from_gtv(args);
+
+    val ads = (a_ad: accounts.account_auth_descriptor, ad_s: accounts.auth_descriptor_signer) @* {
+        a_ad.account.id == account_id,
+        ad_s.account_auth_descriptor == a_ad,
+        ad_s.id == params.signer,
+        a_ad.auth_type == accounts.auth_type.S,
+        a_ad.id in auth_descriptor_ids
+    } (a_ad.id);
+    if (not ads.empty()) {
+        return ads[0];
+    }
+
+    for (ad in accounts.account_auth_descriptor @* { .account.id == account_id, .id in auth_descriptor_ids }) {
+        if (accounts.has_flags(ad, ["A"])) return ad.id;
+    }
+
+    return null;
+}
+
+@extend(auth.auth_handler)
+function () = auth.add_overridable_auth_handler(
+    scope = rell.meta(delete_auth_descriptors_for_signer).mount_name,
+    flags = [],
+    message = delete_auth_descriptors_for_signer_message(*),
+    resolver = delete_auth_descriptors_for_signer_resolver(*)
+);
+
+operation delete_auth_descriptors_for_signer(signer: byte_array) {
+    val account = auth.authenticate();
+
+    val ads = (a_ad: accounts.account_auth_descriptor, ad_s: accounts.auth_descriptor_signer) @* {
+        a_ad.account == account,
+        ad_s.account_auth_descriptor == a_ad,
+        ad_s.id == signer
+    } (a_ad);
+    for (ad in ads) {
+        accounts.delete_auth_descriptor(ad);
+    }
+}
+
+function delete_all_auth_descriptors_except_main_message(gtv) {
+    return "Please sign the message\nto delete all auth descriptors except main\nfrom account:\n{account_id}";
+}
+
+function delete_all_auth_descriptors_except_main_resolver(args: gtv, account_id: byte_array, auth_descriptor_ids: list&lt;byte_array&gt;) {
+    val main_auth_descriptor = require(
+        accounts.main_auth_descriptor @? { .account.id == account_id } .auth_descriptor,
+        "Account &lt;%s&gt; does not have main auth descriptor set".format(account_id)
+    );
+
+    return if (main_auth_descriptor.id in auth_descriptor_ids) main_auth_descriptor.id else null;
+}
+
+@extend(auth.auth_handler)
+function () = auth.add_overridable_auth_handler(
+    scope = rell.meta(delete_all_auth_descriptors_except_main).mount_name,
+    flags = ["A"],
+    message = delete_all_auth_descriptors_except_main_message(*),
+    resolver = delete_all_auth_descriptors_except_main_resolver(*)
+);
+
+operation delete_all_auth_descriptors_except_main() {
+    val account = auth.authenticate();
+    accounts.delete_all_auth_descriptors_except_main(account);
+}
+
+function add_auth_descriptor_message(gtv) {
+    val params = struct&lt;add_auth_descriptor&gt;.from_gtv(gtv);
+    val flags = params.new_desc.args[0];
+
+    return "Please sign the message\nto add auth descriptor\nwith flags:\n%s\n\nto account:\n{account_id}".format(flags);
+}
+
+@extend(auth.auth_handler)
+function () = auth.add_overridable_auth_handler(
+    scope = rell.meta(add_auth_descriptor).mount_name,
+    flags = ["A"],
+    message = add_auth_descriptor_message(*)
+);
+
+operation add_auth_descriptor(new_desc: accounts.auth_descriptor) {
+    val account = auth.authenticate();
+    val signers = accounts.get_signers(new_desc);
+    auth.verify_signers(signers);
+    accounts.add_auth_descriptor(account, new_desc);
+}
+
+function update_main_auth_descriptor_message(gtv) {
+    val params = struct&lt;update_main_auth_descriptor&gt;.from_gtv(gtv);
+    val flags = params.new_desc.args[0];
+    val signers = accounts.get_signers(params.new_desc);
+
+    return "Please sign the message to\nset new main auth descriptor\n\nwith flags:\n%s\n\nand signers:\n%s\n\nof account:\n{account_id}".format(flags, signers);
+}
+
+function update_main_auth_descriptor_resolver(args: gtv, account_id: byte_array, auth_descriptor_ids: list&lt;byte_array&gt;) {
+    val main_auth_descriptor = require(
+        accounts.main_auth_descriptor @? { .account.id == account_id } .auth_descriptor,
+        "Account &lt;%s&gt; does not have main auth descriptor set".format(account_id)
+    );
+
+    return if (main_auth_descriptor.id in auth_descriptor_ids) main_auth_descriptor.id else null;
+}
+
+@extend(auth.auth_handler)
+function () = auth.add_overridable_auth_handler(
+    scope = rell.meta(update_main_auth_descriptor).mount_name,
+    flags = ["A"],
+    message = update_main_auth_descriptor_message(*),
+    resolver = update_main_auth_descriptor_resolver(*)
+);
+
+operation update_main_auth_descriptor(new_desc: accounts.auth_descriptor) {
+    val account = auth.authenticate();
+    auth.verify_signers(accounts.get_signers(new_desc));
+    accounts.update_main_auth_descriptor(account, new_desc);
+}
+</string>
+                            </entry>
+                            <entry key="lib/ft4/external/accounts/queries.rell">
+                                <string>
+query get_config() {
+    return (
+        rate_limit = accounts.get_rate_limit_config(),
+        auth_descriptor = accounts.get_auth_descriptor_config()
+    );
+}
+
+query get_account_rate_limit_last_update(account_id: byte_array) {
+    val account = accounts.Account(account_id);
+    if (accounts.get_rate_limit_config_for_account(account).active == false) return (points = 0, last_update = 0);
+    
+    return accounts.rl_state @ { account }
+    (
+        .points, 
+        .last_update
+    );
+}
+
+query is_auth_descriptor_valid(account_id: byte_array, auth_descriptor_id: byte_array) {
+    return not accounts.have_violating_rules(accounts.account_auth_descriptor @ {
+        .account.id == account_id,
+        .id == auth_descriptor_id
+    });
+}
+
+query get_account_auth_descriptors(id: byte_array) {
+    return accounts.get_auth_descriptors(id);
+}
+
+query get_account_auth_descriptors_by_signer(account_id: byte_array, signer: byte_array) {
+    return accounts.get_auth_descriptors_by_signer(account_id, signer);
+}
+
+query get_account_auth_descriptor_by_id(account_id: byte_array, id: byte_array) {
+    return accounts.account_auth_descriptor @ {
+        .id == id,
+        .account.id == account_id
+    } ( accounts.get_auth_descriptor_data($.to_struct()) );
+}
+
+query get_account_main_auth_descriptor(account_id: byte_array) {
+    return accounts.main_auth_descriptor @ {
+        .account.id == account_id
+    } ( accounts.get_auth_descriptor_data(.auth_descriptor.to_struct()) );
+}
+
+query get_account_by_id(id: byte_array) {
+    return accounts.account @? { id } ( .id );
+}
+
+query get_accounts_by_signer(id: byte_array, page_size: integer?, page_cursor: text?) {
+    return utils.make_page(
+        accounts.get_paginated_accounts_by_signer(id, page_size, page_cursor),
+        page_size
+    );
+}
+
+query get_accounts_by_auth_descriptor_id(id: byte_array, page_size: integer?, page_cursor: text?) {
+    return utils.make_page(
+        accounts.get_paginated_accounts_by_ad_id(id, page_size, page_cursor),
+        page_size
+    );
+}
+
+query get_accounts_by_type(type: text, page_size: integer, page_cursor: text?) {
+    return utils.make_page(
+        accounts.get_paginated_accounts_by_type(type, page_size, page_cursor),
+        page_size
+    );
+}
+
+query get_auth_descriptor_counter(
+    account_id: byte_array, 
+    auth_descriptor_id: byte_array
+) = accounts.account_auth_descriptor @? { 
+        .account.id == account_id, 
+        .id == auth_descriptor_id 
+    } ( .ctr );
+</string>
+                            </entry>
+                            <entry key="lib/ft4/external/accounts/strategies/module.rell">
+                                <string>@mount('ft4')
+module;
+
+import ^^^.core.accounts.strategies;
+import ^^^.core.accounts;
+import ^^^.auth;
+</string>
+                            </entry>
+                            <entry key="lib/ft4/external/accounts/strategies/operations.rell">
+                                <string>operation register_account() {
+    strategies.register_account();
+}
+</string>
+                            </entry>
+                            <entry key="lib/ft4/external/accounts/strategies/queries.rell">
+                                <string>query get_register_account_message(
+    strategy_operation: gtx_operation,
+    register_account_operation: gtx_operation
+) = strategies.get_register_account_message(strategy_operation, register_account_operation);
+
+query get_enabled_registration_strategies(): set&lt;text&gt; = strategies.strategy().keys();
+</string>
+                            </entry>
+                            <entry key="lib/ft4/external/auth/module.rell">
+                                <string>@mount('ft4')
+module;
+
+import ^^.core.auth;
+import ^^.utils;
+</string>
+                            </entry>
+                            <entry key="lib/ft4/external/auth/operations.rell">
+                                <string>
+operation evm_auth(
+    account_id: byte_array,
+    auth_descriptor_id: byte_array,
+    signatures: list&lt;auth.signature?&gt;
+) {
+    auth.require_regular_next_operation();
+}
+
+operation evm_signatures(
+    signers: list&lt;byte_array&gt;, 
+    signatures: list&lt;auth.signature?&gt;
+) {
+    auth.require_evm_signatures_can_be_used();
+}
+
+operation ft_auth(
+    account_id: byte_array,
+    auth_descriptor_id: byte_array
+) {
+    auth.require_regular_next_operation();
+}
+</string>
+                            </entry>
+                            <entry key="lib/ft4/external/auth/queries.rell">
+                                <string>struct _auth_handler_client {
+    name: text;
+    flags: list&lt;text&gt;;
+    dynamic: boolean;
+}
+
+query get_auth_flags(op_name: name) = auth.get_auth_handler(op_name).flags;
+
+query get_auth_message_template(op_name: name, op_args: gtv?) = auth.get_auth_message_template(op_name, op_args);
+
+query get_login_config(name? = null) {
+    val configs = auth.login_config();
+    val config_name = name ?: auth.DEFAULT_LOGIN_CONFIG_NAME;
+
+    if (config_name == auth.DEFAULT_LOGIN_CONFIG_NAME) {
+        return if (config_name in configs)
+            configs[config_name]
+        else
+            auth._login_config(
+                flags = [],
+                rules = auth.ttl(1 * utils.MILLISECONDS_PER_DAY)
+            );
+    }
+    
+    return require(
+        configs.get_or_null(config_name), 
+        "Unknown login configuration &lt;%s&gt;".format(config_name)
+    );
+}
+
+query get_auth_handler_for_operation(op_name: name) {
+  val handler = auth.get_auth_handler(op_name);
+  return _auth_handler_client(
+    name=op_name,
+    flags=handler.flags,
+    dynamic=handler.resolver != null
+  );
+}
+
+query get_first_allowed_auth_descriptor_by_signers(
+  op_name: name,
+  args: gtv,
+  account_id: byte_array,
+  signers: list&lt;byte_array&gt;
+): byte_array? = auth.get_first_allowed_auth_descriptor_by_signers(op_name, args, account_id, signers);
+
+query get_first_allowed_auth_descriptor(
+  op_name: name,
+  args: gtv,
+  account_id: byte_array,
+  ad_ids: list&lt;byte_array&gt;
+): byte_array? = auth.get_first_allowed_auth_descriptor(op_name, args, account_id, ad_ids);
+
+query get_all_auth_handlers() {
+  val auth_handlers = auth.auth_handler();
+  return auth_handlers @* {}(
+    _auth_handler_client(
+      name=$[0],
+      flags=$[1].flags,
+      dynamic=$[1].resolver != null
+    )
+  );
+}
+</string>
+                            </entry>
+                            <entry key="lib/ft4/module.rell">
+                                <string>struct module_args {
+    query_max_page_size: integer = 100;
+}
+
+function get_module_args() {
+    return chain_context.args;
+}
+</string>
+                            </entry>
+                            <entry key="lib/ft4/utils/pagination.rell">
+                                <string>import ^.{ get_module_args };
+
+struct page_cursor {
+    before_rowid: rowid? = null;
+}
+
+struct pagination_result {
+    data: gtv;
+    rowid: rowid;
+}
+
+function encode_cursor(page_cursor) = page_cursor.to_bytes().to_base64();
+
+function decode_cursor(cursor: text) = page_cursor.from_bytes(byte_array.from_base64(cursor));
+
+struct paged_result {
+    next_cursor: text?;
+    data: list&lt;gtv&gt;;
+}
+
+function null_page() = paged_result(
+    next_cursor = null,
+    data = list&lt;gtv&gt;()
+);
+
+function fetch_data_size(page_size: integer? = get_module_args().query_max_page_size) = 
+    min(get_module_args().query_max_page_size, page_size ?: get_module_args().query_max_page_size) + 1;
+
+function before_rowid(page_cursor: text?) {
+    var before_rowid: rowid? = null;
+    if (page_cursor??) {
+        val cursor = decode_cursor(page_cursor);
+        before_rowid = cursor.before_rowid;
+    }
+    return before_rowid;
+}
+
+
+function make_page(pagination_results: list&lt;pagination_result&gt;, page_size: integer?): paged_result {
+    if (page_size != null) {
+        require(page_size &gt; 0, "Must return at least one item");
+    }
+    if (empty(pagination_results)) {
+         return null_page();
+    }
+    // adding +1 should help with next page null situation when current page size
+    // is equal to max page size
+    if(pagination_results.size() &lt; fetch_data_size(page_size)) {
+        return paged_result(
+            next_cursor = null,
+            data = pagination_results  @* {} .data
+        );
+    }
+    val paginated_result = pagination_results.sub(0, pagination_results.size()-1);
+    val next_id = pagination_results[pagination_results.size()-2].rowid;
+    val next_cursor = page_cursor(
+        next_id
+    );
+    return paged_result(
+        next_cursor = encode_cursor(next_cursor),
+        data = paginated_result  @* {} .data
+    );
+}
+</string>
+                            </entry>
+                            <entry key="lib/ft4/utils/utils.rell">
+                                <string>val MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/*
+ * For complex validation we might not want to use simple "require()"
+ * but an error message that is returned. 
+ */
+struct validation_result {
+    valid: boolean;
+    error: text? = null;
+}
+
+val VALID = validation_result(true, null);
+
+function invalid(error: text) = validation_result(false, error);
+
+function make_auth_message(message: text) {
+    return "Blockchain:\n{blockchain_rid}\n\n" + message + "\n\nNonce: {nonce}";
+}
+
+function derive_nonce(op: gtx_operation, nonce: integer) {
+    return (
+        chain_context.blockchain_rid, 
+        op.name, 
+        op.args, 
+        nonce
+    ).hash().to_hex().upper_case();
+}
+
+function latest_time() =
+    if (op_context.exists and op_context.block_height &gt; 0)
+        op_context.last_block_time
+    else
+        block @ {} (@max .timestamp) ?: 0;
+
+function validate_blockchain_rid(blockchain_rid: byte_array, descriptor: text = "blockchain_rid") {
+    require(blockchain_rid.size() &gt; 0, "%s cannot be empty".format(descriptor));
+    require(
+        blockchain_rid.size() == 32, 
+        "%s &lt;%s&gt; has invalid length. Expected &lt;32&gt; bytes, found &lt;%d&gt;.".format(descriptor, blockchain_rid, blockchain_rid.size())
+    );
+}
+
+/**
+ * Converts a gtv value to a pretty text representation, with newlines and indentations.
+ *
+ * @param gtv                   the gtv value to convert.
+ *
+ * @param indentation_index     how many collections deep we are. Used for recursive
+ *                              iteration on collections
+ *
+ * @param in_dict               if inside a dictionary, it will not add indent output
+ *                              except collections. This prevents dicts having `\t`
+ *                              between key and value.
+ */
+function convert_gtv_to_text(
+    gtv,
+    indentation_index: integer = 0,
+    in_dict: boolean = false
+): text {
+    var indents = "\t".repeat(indentation_index);
+    var string: text = if (in_dict) "" else indents;
+    /*
+     * supported types
+     * - text
+     * - byte_array
+     * - dictionary
+     * - list
+     * - integer
+     * - decimal
+     * - big_integer
+     * - boolean
+     */
+    if (is_text(gtv)){
+        string += text.from_gtv(gtv);
+    }
+    else if (is_byte_array(gtv)){
+        string += byte_array.from_gtv(gtv).to_hex().upper_case();
+    }
+    else if (is_dict(gtv)) {
+        val dict = map&lt;text, gtv&gt;.from_gtv(gtv);
+        if (dict.size() == 0) {
+            string += "{ }";
+        } else {
+            string += "{\n";
+            for (elm in dict) {
+                string += indents + "\t" +
+                    elm[0] + ": " +
+                    convert_gtv_to_text(elm[1], indentation_index + 1, true) + ",\n";
+            }
+            string = 
+                // remove trailing comma and newline
+                string.sub(0, string.size()-2) +
+                //add newline back
+                "\n" +
+                // add indents or, if base level, add two spaces to match the 
+                // `- `(dash+space) at the start of the line
+                (if (indentation_index != 0) indents else "  ") + 
+                //close the dict
+                "}";
+        }
+    }
+    else if (is_list(gtv)) {
+        val l = list&lt;gtv&gt;.from_gtv(gtv);
+        if (l.size() == 0) {
+            string += "[ ]";
+        } else {
+            string += "[\n";
+            for (elm in l) {
+                string += convert_gtv_to_text(elm, indentation_index + 1) + ",\n";
+            }
+            string =
+                // remove trailing comma and newline
+                string.sub(0, string.size()-2) +
+                //add newline back
+                "\n" +
+                // add indents or, if base level, add two spaces to match the
+                // `- `(dash+space) at the start of the line
+                (if (indentation_index != 0) indents else "  ") + 
+                //close the list
+                "]";
+        }
+    }
+    // integer, decimal, big_integer, boolean
+    else {
+        string += gtv;
+    }
+    return string;
+}
+
+/*
+ * Following list of functions are used to check type of object wrapped inside gtv (gtv is Chromia's ASN.1 based encoding).
+ * See below for how encoding is defined for different types:
+ * https://bitbucket.org/chromawallet/postchain-client/src/430bc34bf945905e4883af317f16bbb277102175/src/gtv/definition.ts#lines-8
+ * Depending on wrapped value type, first byte of serialized gtv will have one of following values:
+ * - byte_array  -&gt; x"a1" (161)
+ * - text        -&gt; x"a2" (162)
+ * - integer     -&gt; x"a3" (163)
+ * - dict (map)  -&gt; x"a4" (164)
+ * - list        -&gt; x"a5" (165)
+ * - big_integer -&gt; x"a6" (166)
+ *
+ * In the future these functions will be replaced with native Rell functions.
+ */ 
+
+function is_byte_array(gtv) = gtv.to_bytes()[0] == 161;
+
+function is_text(gtv) = gtv.to_bytes()[0] == 162;
+
+function is_integer(gtv) = gtv.to_bytes()[0] == 163;
+
+function is_dict(gtv) = gtv.to_bytes()[0] == 164;
+
+function is_list(gtv) = gtv.to_bytes()[0] == 165;
+
+function is_big_integer(gtv) = gtv.to_bytes()[0] == 166;
+</string>
+                            </entry>
+                            <entry key="lib/ft4/version.rell">
+                                <string>@mount('ft4')
+module;
+
+query get_version(): text = "1.0.0";
+</string>
+                            </entry>
+                            <entry key="lib/iccf/module.rell">
+                                <string>module;
+
+/**
+ * Inter-Chain Confirmation Facility (ICCF)
+ * 
+ * This module intends to make it easier for developers to verify that a proof has been 
+ * sent as a separate operation in this transaction.
+ */
+
+val iccf_op_name = "iccf_proof";
+// For verifications across clusters all 6 arguments must be included in the proof
+val iccf_anchored_proof_argument_count = 6;
+
+/**
+ * Requires the presented transaction to be proved and extracts an argument from the specified operation
+ * 
+ * @param gtx_transaction The transaction to verify
+ * @param op_name Name of the operation to extract
+ * @param arg Index of the argument to be extracted (default: first argument)
+ * @param verify_signers Whether or not the signers must match current transaction signatures
+ * @param require_anchored_proof Whether or not we require inclusion of a proof that the block containing the transaction has been anchored in cluster anchoring chain
+ */
+function extract_operation_arg(
+    gtx_transaction,
+    op_name: text,
+    arg: integer = 0,
+    verify_signers: boolean = true,
+    require_anchored_proof: boolean = false
+): gtv {
+    val args = extract_operation_args(gtx_transaction, op_name, verify_signers, require_anchored_proof);
+    require(
+        args.size() &gt;= arg,
+        "Argument number %d not found on operation %s. %d arguments found"
+            .format(arg, op_name, args.size())
+    );
+    return args[arg];
+}
+
+/**
+ * Requires the presented transaction to be proved and extracts arguments of the specified operation
+ * 
+ * @param gtx_transaction The transaction to verify
+ * @param op_name Name of the operation to extract
+ * @param verify_signers Whether or not the signers must match current transaction signatures
+ * @param require_anchored_proof Whether or not we require inclusion of a proof that the block containing the transaction has been anchored in cluster anchoring chain
+ */
+function extract_operation_args(
+    gtx_transaction,
+    op_name: text,
+    verify_signers: boolean = true,
+    require_anchored_proof: boolean = false
+): list&lt;gtv&gt; {
+    return require_operation(gtx_transaction, op_name, verify_signers, require_anchored_proof).args;
+}
+
+/**
+ * Requires the presented transaction to be proved and extracts the specified operation
+ * 
+ * @param gtx_transaction The transaction to verify
+ * @param op_name Name of the operation to extract
+ * @param verify_signers Whether or not the signers must match current transaction signatures
+ * @param require_anchored_proof Whether or not we require inclusion of a proof that the block containing the transaction has been anchored in cluster anchoring chain
+ */
+function require_operation(
+    gtx_transaction,
+    op_name: text,
+    verify_signers: boolean = true,
+    require_anchored_proof: boolean = false
+): gtx_operation {
+    require_valid_proof(gtx_transaction, verify_signers, require_anchored_proof);
+    return require(
+        gtx_transaction.body.operations @? { .name == op_name },
+        "Operation with name %s not found in transaction %s".format(op_name, gtx_transaction)
+    );
+}
+
+/**
+ * Requires the presented transaction to be proved
+ * 
+ * @param gtx_transaction The transaction to verify
+ * @param verify_signers Whether or not the signers must match current transaction signatures
+ * @param require_anchored_proof Whether or not we require inclusion of a proof that the block containing the transaction has been anchored in cluster anchoring chain
+ */
+function require_valid_proof(
+    gtx_transaction,
+    verify_signers: boolean = true,
+    require_anchored_proof: boolean = false
+) {
+    val tx_hash = gtx_transaction.to_gtv().hash();
+    require(_has_proof(gtx_transaction, require_anchored_proof), "No proof operation present for TX");
+    if (verify_signers) {
+        require(
+            _has_signers(gtx_transaction),
+            "Proof TX has to be signed by all the signers that signed the source TX"
+        );
+    }
+    return gtx_transaction.body.operations;
+}
+
+/**
+ * Checks whether or not the current transaction is signed by the same signers as the given transaction
+ * 
+ * @param gtx_transaction The transaction to verify signers against
+ */
+function _has_signers(gtx_transaction): boolean {
+    val proof_signers = gtx_transaction.body.signers @* { } ( byte_array.from_gtv($) );
+    val signers = op_context.get_signers();
+    return signers.contains_all(proof_signers);
+}
+
+/**
+ * Checks whether the current transaction contains a `iccf_proof` operation corresponding to the given transaction.
+ * 
+ * @param gtx_transaction The transaction to check
+ * @param require_anchored_proof Whether or not we require inclusion of a proof that the block containing the transaction has been anchored in cluster anchoring chain
+ */
+function _has_proof(
+    gtx_transaction,
+    require_anchored_proof: boolean = false
+): boolean {
+    val blockchain_rid = gtx_transaction.body.blockchain_rid;
+    val tx_hash = gtx_transaction.to_gtv().hash();
+    val proof_operation = op_context.get_all_operations() @? {
+        .name == iccf_op_name,
+        byte_array.from_gtv(.args[0]) == blockchain_rid,
+        byte_array.from_gtv(.args[1]) == tx_hash,
+        not require_anchored_proof or .args.size() == iccf_anchored_proof_argument_count
+    };
+    return exists(proof_operation);
+}
+
+/**
+ * Prevents this transaction to be proved multiple times by storing the hash
+ * 
+ * @param gtx_transaction The transaction to make unique
+ */
+function make_transaction_unique(gtx_transaction) {
+    require(
+        not(exists(
+            iccf_verified_transaction @? {
+                .hash == gtx_transaction.hash()
+            }
+        )),
+        "Transaction has already been processed"
+    );
+    create iccf_verified_transaction ( gtx_transaction.hash() );
+}
+
+@log
+entity iccf_verified_transaction {
+    key hash: byte_array;
+}
+</string>
+                            </entry>
+                            <entry key="lib/yours/accounts.rell">
+                                <string>val LOCKED_ACCOUNT_KIND = "LOCKED";
+
+/**
+ * Helper function to provides the possibility to lock an asset for a user on the dapp chain.
+ * Each account can have a unique locked account associated with it which is a special account,
+ * where the owner itself cannot transfer it out from themself, instead the dapp controls it.
+ * 
+ * @see ensure_locked_account(account_id)
+ * @see get_locked_account_id(account_id)
+ * 
+ * @param account_id The account to get the locked account for.
+ * @returns The locked account.
+ */
+function get_locked_account(account_id: byte_array): ft4.accounts.account? {
+  val id = get_locked_account_id(account_id);
+  return ft4.accounts.account @? { id };
+}
+
+/**
+ * Ensures that a locked account exists for the given account.
+ * 
+ * @see get_locked_account(account_id)
+ * @see get_locked_account_id(account_id)
+ * 
+ * @param account_id The account to ensure the locked account for.
+ * @returns The locked account.
+ */
+function ensure_locked_account(account_id: byte_array) {
+  val id = get_locked_account_id(account_id);
+  return ft4.accounts.account @? { id } ?: ft4.accounts.create_account_without_auth(id, LOCKED_ACCOUNT_KIND);
+}
+
+/**
+ * Helper function to get the ID of the locked account for a given account.
+ * 
+ * @see get_locked_account(account_id)
+ * @see ensure_locked_account(account_id)
+ * 
+ * @param account_id The account to get the locked account ID for.
+ * @returns The ID of the locked account.
+ */
+function get_locked_account_id(account_id: byte_array) {
+  return ("SA", LOCKED_ACCOUNT_KIND, account_id).hash();
+}
+</string>
+                            </entry>
+                            <entry key="lib/yours/crosschain/module.rell">
+                                <string>@mount("yours")
+module;
+
+import ^^.yours.*;
+
+namespace ft4 {
+  import lib.ft4.auth;
+  import lib.ft4.accounts;
+}
+
+import lib.iccf;
+</string>
+                            </entry>
+                            <entry key="lib/yours/crosschain/operations.rell">
+                                <string>@extend(ft4.auth.auth_handler)
+function () = ft4.auth.add_overridable_auth_handler(
+    scope = rell.meta(init_transfer).mount_name,
+    flags = ["T"]
+  );
+
+/**
+ * This operation initializes the transfer metadata for a token transfer.
+ * It is executed on the source blockchain that you want to transfer the
+ * token away from.
+ *
+ * It is an extension of the FT4 ICCF flow and the purpose is to
+ * pass (the correct) metadata of tokens to the target chain.
+ *
+ * @param metadata The metadata to be initialized for the transfer. Expected to be in `gtv_pretty` format.
+ */
+operation init_transfer(
+  recipient_id: byte_array,
+  project: name,
+  collection: name,
+  token_id: integer,
+  amount: integer,
+  metadata: token_metadata_incoming
+) {
+  log("---------- init_transfer ----------");
+  val account = ft4.auth.authenticate();
+
+  val token = require(get_token(project, collection, token_id), "Token Not Found");
+  val existing_metadata = get_metadata(token);
+
+  _validate_metadata(metadata, existing_metadata);
+
+  before_init_transfer(token, account);
+
+  burn(token, balance_info(account, amount));
+
+  create pending_transfer (
+    sender = account,
+    transaction = op_context.transaction,
+    op_index = op_context.op_index
+  );
+
+  after_init_transfer(token, account);
+}
+
+function _validate_metadata(incoming: token_metadata_incoming, outgoing: token_metadata_outgoing) {
+  require(incoming.name == outgoing.name, "Invalid Metadata");
+  require(incoming.description == outgoing.description, "Invalid Metadata");
+  require(incoming.image == outgoing.image, "Invalid Metadata");
+  require(incoming.animation_url == outgoing.animation_url, "Invalid Metadata");
+  _validate_properties(incoming, outgoing);
+}
+
+function _validate_properties(incoming: token_metadata_incoming, outgoing: token_metadata_outgoing) {
+  val incoming_properties = _json_to_gtv_map(incoming.properties);
+  val outgoing_properties = outgoing.properties;
+  for (name in incoming_properties.keys()) {
+    val incoming_value = incoming_properties[name];
+    val outgoing_value = outgoing_properties[name];
+
+    if (incoming_value != outgoing_value) {
+      require(incoming_value == outgoing_value, "Invalid Metadata");
+    }
+  }
+}
+
+/**
+ * This operation applies the transfer metadata to a token transfer.
+ * It is executed against the target blockchain where you want the
+ * token to be imported into.
+ */
+operation apply_transfer(
+  init_transfer_tx: gtx_transaction,
+  init_tx_op_index: integer
+) {
+  log("---------- apply_transfer ----------");
+  val (init_transfer_details, _) = _validate_apply_transfer(
+    init_transfer_tx,
+    init_tx_op_index
+  );
+
+  // Add transfer to applied transfers table so that it cannot be applied more than once
+  create applied_transfers (
+    init_tx_rid = init_transfer_details.tx_rid,
+    init_op_index = init_tx_op_index,
+    transaction = op_context.transaction,
+    op_index = op_context.op_index
+  );
+
+  val transferred_metadata = init_transfer_details.args.metadata;
+  var token = get_token(
+    transferred_metadata.yours.project,
+    transferred_metadata.yours.collection,
+    init_transfer_details.args.token_id
+  );
+
+  if (token == null) {
+    token = create_token_with_id(
+      token_info(
+        project = transferred_metadata.yours.project,
+        collection = transferred_metadata.yours.collection,
+        name = transferred_metadata.name,
+        modules = transferred_metadata.yours.modules
+      ),
+      init_transfer_details.args.token_id
+    );
+  }
+
+  _apply_transfer(
+    init_transfer_details.sender_account_id,
+    token,
+    init_transfer_details.args.amount,
+    transferred_metadata
+  );
+}
+
+/**
+ * This operation completes the transfer by deleting the pending transfer from the
+ * applied_transfers table.
+ * 
+ * This operation is for bookkeeping purposes and it is not the end of the world
+ * if it is not executed.
+ * 
+ * The worst case scenario is that the user will believe that they have an additional
+ * transfer to complete, but when they try to complete it, it will fail because
+ * the transfer has already been completed.
+ */
+operation complete_transfer(
+  final_apply_transfer_tx: gtx_transaction,
+  op_index: integer
+) {
+  log("---------- complete_transfer ----------");
+  require(
+    final_apply_transfer_tx.body.operations[op_index].name == rell.meta(apply_transfer).mount_name,
+    "Operation at op_index was not apply_transfer"
+  );
+
+  val final_apply_transfer_args = struct&lt;apply_transfer&gt;
+    .from_gtv(
+      final_apply_transfer_tx
+        .body
+        .operations[op_index]
+        .args
+        .to_gtv()
+    );
+
+  val init_transfer_tx_hash = final_apply_transfer_args.init_transfer_tx.to_gtv().hash();
+
+  iccf.require_valid_proof(
+    final_apply_transfer_tx,
+    require_anchored_proof = true,
+    verify_signers = false
+  );
+
+  delete pending_transfer @ {
+    .transaction
+    .tx_hash == init_transfer_tx_hash,
+    .op_index == final_apply_transfer_args
+    .init_tx_op_index
+  };
+}
+
+function _apply_transfer(account_id: byte_array, token, amount: integer, token_metadata: token_metadata_incoming) {
+  mint(token, balance_info(ft4.accounts.account @ { account_id }, amount));
+  _apply_common_metadata(token, token_metadata);
+
+  val imported_attributes = imported_attributes @? { token };
+  if (imported_attributes == null) {
+    create imported_attributes ( token, token_metadata.properties );
+  } else {
+    imported_attributes.json = token_metadata.properties;
+  }
+
+  val properties = _json_to_gtv_map(token_metadata.properties);
+  after_apply_transfer(token, set(token_metadata.yours.modules), properties);
+}
+
+function _apply_common_metadata(token, metadata: token_metadata_incoming) {
+  attach_image(token, metadata.image);
+  attach_description(token, metadata.description);
+  attach_animation(token, metadata.animation_url);
+  attach_modules(token, metadata.yours.modules);
+}
+
+function _validate_apply_transfer(
+  init_transfer_tx: gtx_transaction,
+  init_tx_op_index: integer
+) {
+  val init_transfer_details = _get_init_transfer_details(init_transfer_tx, init_tx_op_index);
+
+  require(
+    applied_transfers @? {
+      .init_tx_rid == init_transfer_details.tx_rid,
+      .init_op_index == init_tx_op_index
+    } == null,
+    "Transaction &lt;%s&gt; transfer at index &lt;%s&gt; has already been applied on this chain."
+      .format(init_transfer_details.tx_rid, init_tx_op_index)
+  );
+
+  require(
+    canceled_transfers @? { init_transfer_details.tx_rid, init_tx_op_index } == null,
+    "Transaction &lt;%s&gt; transfer at index &lt;%s&gt; has already been canceled on this chain."
+      .format(init_transfer_details.tx_rid, init_tx_op_index)
+  );
+
+  require(
+    unapplied_transfers @? { init_transfer_details.tx_rid, init_tx_op_index } == null,
+    "Transaction &lt;%s&gt; transfer at index &lt;%s&gt; has already been unapplied on this chain."
+      .format(init_transfer_details.tx_rid, init_tx_op_index)
+  );
+
+  iccf.require_valid_proof(
+    init_transfer_tx,
+    require_anchored_proof = true,
+    verify_signers = false
+  );
+
+  return (init_transfer_details, init_transfer_tx.body.blockchain_rid);
+}
+
+function _get_init_transfer_details(tx: gtx_transaction, op_index: integer) {
+  val op = tx.body.operations[op_index];
+
+  require(
+    op.name == rell.meta(init_transfer).mount_name,
+    "Invalid parameters. Expected &lt;%s&gt; at index &lt;%d&gt;, found &lt;%s&gt;"
+      .format(rell.meta(init_transfer).mount_name, op_index, op.name)
+  );
+
+  val tx_rid = tx.body.hash();
+  val args = struct&lt;init_transfer&gt;.from_gtv(op.args.to_gtv());
+
+  val auth_op = tx.body.operations[op_index - 1];
+  val sender_account_id = ft4.auth.extract_account_id(auth_op);
+
+  return (
+    tx_rid = tx_rid,
+    args = args,
+    sender_account_id = sender_account_id
+  );
+}
+</string>
+                            </entry>
+                            <entry key="lib/yours/crosschain/queries.rell">
+                                <string>query get_pending_transfers_for_account(account_id: byte_array) {
+  return pending_transfer @? {
+    .sender.id == account_id
+  } (
+    tx_data = .transaction.tx_data,
+    op_index = .op_index
+  );
+}
+</string>
+                            </entry>
+                            <entry key="lib/yours/crosschain/transfer.rell">
+                                <string>entity applied_transfers {
+  key init_tx_rid, init_op_index;
+  init_tx_rid: byte_array;
+  init_op_index: integer;
+  transaction;
+  op_index: integer;
+}
+
+entity canceled_transfers {
+  key init_tx_rid, init_op_index;
+  init_tx_rid: byte_array;
+  init_op_index: integer;
+}
+
+entity unapplied_transfers {
+  key init_tx_rid, init_op_index;
+  init_tx_rid: byte_array;
+  init_op_index: integer;
+}
+
+entity recalled_transfers {
+  key init_tx_rid, init_op_index;
+  init_tx_rid: byte_array;
+  init_op_index: integer;
+}
+
+entity pending_transfer {
+  key transaction, op_index;
+  op_index: integer;
+  index sender: ft4.accounts.account;
+}
+
+entity reverted_transfer {
+  key init_tx_rid, init_op_index;
+  init_tx_rid: byte_array;
+  init_op_index: integer;
+}
+</string>
+                            </entry>
+                            <entry key="lib/yours/extendables.rell">
+                                <string>
+/**
+ * Allows a caller to hook into outgoing tokens and apply custom logic that has to be executed before.
+ *
+ * @param token to apply the transfer to
+ */
+@extendable
+function before_init_transfer(token, ft4.accounts.account);
+
+/**
+ * Allows a caller to hook into outgoing tokens and apply custom logic that has to be executed after.
+ *
+ * @param token to apply the transfer to
+ */
+
+@extendable
+function after_init_transfer(token, ft4.accounts.account);
+
+/**
+ * Allows a caller to hook into incoming tokens and apply custom logic for its own storage needs
+ *
+ * @param token to apply the transfer to
+ * @param attributes the metadata for the transfer
+ */
+
+@extendable
+function after_apply_transfer(token, modules: set&lt;name&gt;, properties: map&lt;text, gtv&gt;) {}
+
+/**
+ * Allows a caller to populate additional metadata as well as overriding metadata that arrived from cross-chain.
+ *
+ * @param token to apply the transfer to
+ * @param modules to populate the metadata with
+ */
+
+@extendable
+function populate_metadata(token, modules: set&lt;name&gt;): map&lt;text, gtv&gt;?;
+</string>
+                            </entry>
+                            <entry key="lib/yours/metadata.rell">
+                                <string>
+/**
+ * A single token's metadata. An extension of the ERC1155 Metadata standard.
+ * 
+ * Incomining should be used as operation input since map&lt;text, gtv&gt; is not serializable
+ * without losing the name of the nested properties.
+ */
+struct token_metadata_incoming {
+  name;
+  properties: json;
+  yours: yours_metadata;
+  // decimals: integer?; // TODO: Add decimals
+  description: text?;
+  image: text?;
+  animation_url: text?;
+  // localization: localization?; // TODO: Add localization
+}
+
+/**
+ * A single token's metadata. An extension of the ERC1155 Metadata standard.
+ * 
+ * Outgoing should be used as query output in order to preserve the name of the nested properties.
+ */
+struct token_metadata_outgoing {
+  name;
+  properties: map&lt;text, gtv&gt;;
+  yours: yours_metadata;
+  // decimals: integer?; // TODO: Add decimals
+  description: text?;
+  image: text?;
+  animation_url: text?;
+  // localization: localization?; // TODO: Add localization
+}
+
+/**
+ * Yours specific metadata.
+ */
+struct yours_metadata {
+  modules: list&lt;name&gt;;
+  project: name;
+  collection: name;
+}
+
+/**
+ * A single attribute of a token. Compatible with ERC721 OpenSea standard.
+ */
+struct token_attribute {
+  trait_type: text;
+  value: gtv;
+}
+
+/**
+ * Get the metadata for a specific token. This function will gather metadata from the token's base metadata,
+ * as well as the token's modules on this chain that supports it.
+ *
+ * @param token The token to get the metadata for.
+ */
+function get_metadata(token): token_metadata_outgoing {
+  val base_metadata = imported_attributes @? {
+    token
+  } ( _json_to_gtv_map ($.json) ) ?: map&lt;text, gtv&gt;();
+  val metadata = populate_metadata(token, set(token_module @* { token } ( .module_name ))) ?: map&lt;text, gtv&gt;();
+
+  base_metadata.put_all(metadata);
+
+  return token_metadata_outgoing(
+    name = token.name,
+    properties = base_metadata,
+    yours = yours_metadata(
+      collection = token.collection.name,
+      project = token.collection.project.name,
+      modules = token_module @* { token } ( .module_name ),
+    ),
+    description = token_description @? { token } ( .text ),
+    image = token_image @? { token } ( .url ),
+    animation_url = token_animation @? { token } ( .url )
+  );
+}
+</string>
+                            </entry>
+                            <entry key="lib/yours/model.rell">
+                                <string>/**
+ * A project that can contain multiple collections.
+ * 
+ * @param name The name of the project.
+ */
+entity project {
+  key name;
+}
+
+/**
+ * A collection of tokens.
+ * 
+ * @param name The name of the collection.
+ * @param project The project that this collection belongs to.
+ */
+entity collection {
+  key name, project;
+}
+
+/**
+ * The underlying token which can be either fungible or non-fungible.
+ * Dapps are expected to create their own entities which references this token.
+ * 
+ * @param asset The FT4 asset that this token wraps.
+ * @param collection The collection that this token belongs to.
+ */
+entity token {
+  key collection, id: integer;
+  mutable name;
+}
+
+entity token_balance {
+  key token, ft4.accounts.account;
+  mutable amount: integer;
+}
+
+/**
+ * The image for a token. Compatible with ERC721 OpenSea standard.
+ * 
+ * @param token The token.
+ * @param url The URL of the image. This is mutable since the image can change.
+ */
+entity token_image {
+  key token;
+  mutable url: text;
+}
+
+/**
+ * The animation for a token. Compatible with ERC721 OpenSea standard.
+ * 
+ * @param token The token.
+ * @param url The URL of the animation. This is mutable since the animation can change.
+ */
+entity token_animation {
+  key token;
+  mutable url: text;
+}
+
+/**
+ * The description for a token. Compatible with ERC721 OpenSea standard.
+ * 
+ * @param token The token.
+ * @param text The description. This is mutable since the description can change.
+ */
+entity token_description {
+  key token;
+  mutable text;
+}
+
+/**
+ * Modules where tokens are allowed to operate within.
+ * This is primarily used in order to prevent extendable functions with 
+ * the wrong context from being executed.
+ * 
+ * @param token The token.
+ * @param module_name The name of the module where the token has utility inside.
+ */
+entity token_module {
+  key token, module_name: name;
+}
+
+/**
+ * Metadata that has arrived from a different blockchain.
+ * Not every dapp will support the same modules (&amp; utility) for a token.
+ * 
+ * While a chain `B`might only support the token to be used in module `X`.
+ * In the above scenario `chain B` still need to persist metadata for module `B`,
+ * since chain `B` has no idea about module `Y`. But if the tokens gets transferred 
+ * to a chain `C` then we must not lose the metadata of module `Y`.
+ * 
+ * @param token The token that this attribute belongs to.
+ * @param json The JSON representation of the attributes.
+ */
+entity imported_attributes {
+  key token;
+  mutable json;
+}</string>
+                            </entry>
+                            <entry key="lib/yours/module.rell">
+                                <string>@mount("yours")
+module;
+
+namespace ft4 {
+  import lib.ft4.accounts;
+  import lib.ft4.auth;
+}
+</string>
+                            </entry>
+                            <entry key="lib/yours/queries.rell">
+                                <string>
+/**
+ * Returns the metadata of all modules the token has been used within.
+ *
+ * @param token_id of the token to get the metadata for
+ * @returns The metadata of the token in JSON format in order to handle generic attributes values.
+ */
+query metadata(project: name, collection: name, token_id: integer): token_metadata_outgoing? {
+  val token = get_active_token(project, collection, token_id);
+  return if (token != null) get_metadata(token) else null;
+}
+
+query balance(account_id: byte_array, project: name, collection: name, token_id: integer): integer {
+  val token = get_active_token(project, collection, token_id);
+  if (token == null) return 0;
+
+  val account = ft4.accounts.account @? { account_id };
+  if (account == null) return 0;
+
+  return get_balance(token, account);
+}
+</string>
+                            </entry>
+                            <entry key="lib/yours/token.rell">
+                                <string>
+/**
+ * The specification for a token.
+ * 
+ * @param name The name of the token.
+ * @param symbol The symbol of the token.
+ * @param decimals The number of decimals of the token.
+ * @param icon_url The URL of the icon of the token.
+ * @param modules The modules of the token.
+ */
+struct token_info {
+  project: name;
+  collection: name;
+  name: name;
+  modules: list&lt;name&gt;?;
+}
+
+/**
+ * The specification for a balance mutation.
+ * 
+ * @param account The account to mint or burn the token from.
+ * @param amount The amount of the token to mint or burn.
+ */
+struct balance_info {
+  account: ft4.accounts.account;
+  amount: integer;
+}
+
+/**
+ * The specification for a transfer.
+ * 
+ * @param from The account to transfer the token from.
+ * @param to The account to transfer the token to.
+ * @param amount The amount of the token to transfer.
+ */
+struct transfer_info {
+  from: ft4.accounts.account;
+  to: ft4.accounts.account;
+  amount: integer;
+}
+
+/**
+ * Define a new token with a specific ID.
+ *
+ * @param info the information for the token
+ * @param token_id the token id
+ */
+function create_token_with_id(info: token_info, token_id: integer): token {
+  val project = ensure_project(info.project);
+  val collection = ensure_collection(info.collection, project);
+  return _create_token(info, collection, token_id);
+}
+
+/**
+ * Define a new token on the blockchain.
+ *
+ * @param info the information for the token
+ */
+function create_token(info: token_info): token {
+  val project = ensure_project(info.project);
+  val collection = ensure_collection(info.collection, project);
+  return _create_token(info, collection, _get_next_token_id(collection));
+}
+
+/**
+ * Attach an animation to a token.
+ *
+ * @param token to attach the animation to
+ * @param animation_url to attach
+ */
+function attach_animation(token, animation_url: text?): token_animation? {
+  val token_animation = token_animation @? { token };
+  val existing_animation = token_animation?.url;
+
+  if (existing_animation == animation_url) return token_animation;
+  if (token_animation != null and existing_animation != animation_url) {
+    delete token_animation;
+  }
+
+  if (animation_url != null) {
+    return create token_animation ( token, animation_url );
+  }
+  return null;
+}
+
+/**
+ * Attach a description to a token.
+ *
+ * @param token to attach the description to
+ * @param description to attach
+ */
+function attach_description(token, description: text?): token_description? {
+  val token_description = token_description @? { token };
+  val existing_description = token_description?.text;
+
+  if (existing_description == description) return token_description;
+  if (token_description != null and existing_description != description) {
+    delete token_description;
+  }
+
+  if (description != null) {
+    return create token_description ( token, description );
+  }
+  return null;
+}
+
+/**
+ * Attach an image to a token.
+ *
+ * @param token to update the image for
+ * @param image_url to update
+ */
+function attach_image(token, image_url: text?): token_image? {
+  val token_image = token_image @? { token };
+  val existing_image = token_image?.url;
+
+  if (existing_image == image_url) return token_image;
+  if (token_image != null and existing_image != image_url) {
+    delete token_image;
+  }
+
+  if (image_url != null) {
+    return create token_image ( token, image_url );
+  }
+
+  return null;
+}
+
+/**
+ * Attach modules to a token.
+ *
+ * @param token to attach the modules to
+ * @param modules to attach
+ */
+function attach_modules(token, modules: list&lt;name&gt;) {
+  for (m in modules) {
+    attach_module(token, m);
+  }
+}
+
+/**
+ * Attach a module to a token. Making it eligible to be part of the token's metadata.
+ *
+ * @param token to attach the module to
+ * @param module_name to attach
+ */
+function attach_module(token, module_name: name) {
+  val modules = module_name.split(".");
+  val name = modules[modules.size() - 1];
+
+  if (token_module @? { token, name } == null) {
+    create token_module ( token, name );
+  }
+}
+
+/**
+ * Mint tokens to a specific account.
+ *
+ * @param token the token to mint from
+ * @param info the information for the mint
+ */
+function mint(token, info: balance_info) {
+  _mint_balance(token, info.account, info.amount);
+}
+
+/**
+ * Burn tokens from a specific account.
+ *
+ * @param token the token to burn from
+ * @param info the information for the burn
+ */
+function burn(token, info: balance_info) {
+  _burn_balance(token, info.account, info.amount);
+}
+
+/**
+ * Transfer tokens from one account to another.
+ *
+ * @param token to transfer
+ * @param info the information for the transfer
+ */
+function transfer(token, info: transfer_info) {
+  _burn_balance(token, info.from, info.amount);
+  _mint_balance(token, info.to, info.amount);
+}
+
+/**
+ * Get a token by collection and token id.
+ *
+ * @param collection the collection name
+ * @param token_id the token id
+ */
+function get_token(project: name, collection: name, token_id: integer): token? {
+  return token @? {
+    .collection.project.name == project,
+    .collection.name == collection,
+    .id == token_id
+  };
+}
+
+/**
+ * An active token is one where there exists a balance for the token.
+ *
+ * @param project the project name
+ * @param collection the collection name
+ * @param token_id the token id
+ */
+function get_active_token(project: name, collection: name, token_id: integer): token? {
+  return token_balance @? {
+    .token.collection.project.name == project,
+    .token.collection.name == collection,
+    .token.id == token_id
+  } ( .token );
+}
+
+/**
+ * Get the balance of a token for a specific account.
+ *
+ * @param token the token to get the balance for
+ * @param account the account to get the balance for
+ */
+function get_balance(token, account: ft4.accounts.account): integer {
+  return token_balance @? { token, account } ( .amount ) ?: 0;
+}
+
+function _create_token(info: token_info, collection, token_id: integer) {
+  val token = create token ( info.name, collection, token_id );
+
+  val modules = info.modules;
+  if (modules != null) {
+    for (m in modules) {
+      attach_module(token, m);
+    }
+  }
+
+  return token;
+}
+
+function _get_next_token_id(collection): integer {
+  return (token @? { collection } ( @max(.id) ) ?: -1) + 1;
+}
+
+function _get_token_balance(token, ft4.accounts.account) {
+  return token_balance @? { token, account };
+}
+
+function _mint_balance(token, ft4.accounts.account, amount: integer) {
+  val receiver_balance = _get_token_balance(token, account);
+  if (receiver_balance == null) {
+    create token_balance ( token, account, amount );
+  } else {
+    receiver_balance.amount += amount;
+  }
+}
+
+function _burn_balance(token, ft4.accounts.account, amount: integer) {
+  val token_balance = require(_get_token_balance(token, account), "Insufficient balance");
+  val new_amount = token_balance.amount - amount;
+  require(new_amount &gt;= 0, "Insufficient balance");
+
+  if (new_amount == 0) {
+    delete token_balance;
+  } else {
+    token_balance.amount = new_amount;
+  }
+}
+</string>
+                            </entry>
+                            <entry key="lib/yours/util.rell">
+                                <string>function ensure_project(name) {
+  return project @? { name } ?: create project ( name );
+}
+
+function ensure_collection(name, project) {
+  return collection @? { name } ?: create collection ( name, project );
+}
+
+function _json_to_gtv_map(json): map&lt;text, gtv&gt; {
+  return map&lt;text, gtv&gt;.from_gtv(gtv.from_json(json));
+}
+</string>
+                            </entry>
+                            <entry key="shared_module/extensions.rell">
+                                <string>@extend(yours.after_apply_transfer)
+function after_apply_transfer(yours.token, modules: set&lt;name&gt;, properties: map&lt;text, gtv&gt;) {
+  if (modules.contains("times_bridged")) {
+    val times_bridged = times_bridged @? { token };
+    val times_bridged_property = try_call(integer.from_gtv(properties["times_bridged"], *)) ?: 1;
+    if (times_bridged == null) {
+      create times_bridged ( token = token, amount = times_bridged_property + 1 );
+    } else {
+      times_bridged.amount = times_bridged_property + 1;
+    }
+  }
+}
+
+@extend(yours.populate_metadata)
+function populate_metadata(yours.token, modules: set&lt;name&gt;): map&lt;text, gtv&gt;? {
+  if (not modules.contains("times_bridged")) return null;
+
+  val times_bridged = times_bridged @? { token };
+  if (times_bridged == null) return null;
+
+  val metadata = map&lt;text, gtv&gt;();
+  metadata.put("times_bridged", times_bridged.amount.to_gtv());
+  return metadata;
+}
+</string>
+                            </entry>
+                            <entry key="shared_module/functions.rell">
+                                <string>function attach(yours.token) {
+  yours.attach_module(token, "times_bridged");
+  create times_bridged ( token = token, amount = 0 );
+}
+</string>
+                            </entry>
+                            <entry key="shared_module/model.rell">
+                                <string>entity times_bridged {
+  key yours.token;
+  mutable amount: integer;
+}
+</string>
+                            </entry>
+                            <entry key="shared_module/module.rell">
+                                <string>module;
+
+import lib.yours;
+</string>
+                            </entry>
+                        </dict>
+                    </entry>
+                    <entry key="version">
+                        <string>0.13.5</string>
+                    </entry>
+                </dict>
+            </entry>
+        </dict>
+    </entry>
+    <entry key="revolt">
+        <dict>
+            <entry key="fast_revolt_status_timeout">
+                <int>2000</int>
+            </entry>
+            <entry key="revolt_when_should_build_block">
+                <int>1</int>
+            </entry>
+        </dict>
+    </entry>
+</dict>

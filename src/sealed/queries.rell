@@ -1,0 +1,17 @@
+query get_dapps() {
+  return dapp @* { } ( .id );
+}
+
+query get_dapp_deployments(blockchain_rid: byte_array) {
+  return deployed_dapp_config @* { .dapp.id == blockchain_rid } (
+    .timestamp,
+    .hash
+  );
+}
+
+query get_deployment_config(blockchain_rid: byte_array, hash: byte_array) {
+  return deployed_dapp_config @? {
+    .dapp.id == blockchain_rid,
+    .hash == hash 
+  } ( .config );
+}

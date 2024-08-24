@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+
+# Build output
+dist/
+build/
+
+# Environment variables
+.env.local
+.env.*.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Testing
+coverage/
+test.xml
+
+# Temporary files
+tmp/
+temp/
+
+# Miscellaneous
+.cache/
+.npm/
+
+# Optional: Uncomment if using TypeScript
+# *.tsbuildinfo
+
+# Chromia
+.chromia/
+build/
+src/lib/

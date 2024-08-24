@@ -1,0 +1,3 @@
+function normalize(text: text): text {
+  return text; // TODO: Needed?
+}
